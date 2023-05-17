@@ -1,0 +1,20 @@
+[package]
+name = "sentc"
+description = "Sentc client sdk for rust."
+version = "0.1.0"
+edition = "2021"
+license-file = "/LICENSE"
+homepage = "https://sentc.com/"
+authors = ["Sentclose <contact@sentclose.com>", "Jörn Heinemann <j.heinemann@sentclose.com>"]
+repository = ""
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+include = [
+    "Cargo.toml",
+    "LICENSE",
+    "src/**/*",
+]
+
+[dependencies]
+sentc-crypto-common= "^0.1.0"
