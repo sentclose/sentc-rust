@@ -6,7 +6,7 @@ edition = "2021"
 license-file = "LICENSE"
 homepage = "https://sentc.com/"
 authors = ["Sentclose <contact@sentclose.com>", "Jörn Heinemann <j.heinemann@sentclose.com>"]
-repository = ""
+repository = "https://github.com/sentclose/sentc-rust"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
