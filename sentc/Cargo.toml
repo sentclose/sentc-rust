@@ -1,0 +1,40 @@
+[package]
+name = "sentc"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+include = [
+    "Cargo.toml",
+    "LICENSE",
+    "src/**/*",
+]
+
+[dependencies]
+sentc-crypto = {workspace=true, features = ["rust"]}
+
+# json handling
+serde_json = {version = "1.0.81", default-features = false, features = ["alloc"]}
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"]}
+
+# Encrypted at rest
+sentc-ear-core = {workspace = true, optional=true}
+
+# network dependencies
+sentc-crypto-utils = {workspace = true, optional=true}
+sentc-crypto-full = {workspace = true, optional=true}
+
+tokio = {version = "1.32.0", features = ["sync"], default-features = false, optional=true}
+
+[dev-dependencies]
+tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false}
+
+[features]
+network = ["sentc-crypto-utils", "sentc-crypto-full", "tokio"]
+ear = ["sentc-ear-core"]
