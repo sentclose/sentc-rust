@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use sentc_crypto::entities::user::UserDataInt;
-use sentc_crypto::sdk_common::group::GroupHmacData;
+use sentc_crypto::sdk_common::group::{GroupHmacData, GroupInviteReqList};
 use sentc_crypto::sdk_common::user::{OtpRegister, UserDeviceList};
 use sentc_crypto::sdk_common::GroupId;
 use sentc_crypto_full::decode_jwt;
+use sentc_crypto_full::group::{accept_invite, delete_sent_join_req, get_invites_for_user, get_sent_join_req, join_req, reject_invite};
 use sentc_crypto_full::user::{
 	change_password,
 	delete,
@@ -124,6 +125,115 @@ impl User
 		.await?;
 
 		Ok(group_id)
+	}
+
+	//______________________________________________________________________________________________
+
+	pub async fn get_group_invites(&mut self, c: &L1Cache, last_item: Option<&GroupInviteReqList>) -> Result<Vec<GroupInviteReqList>, SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		let (last_time, last_id) = if let Some(li) = last_item {
+			(li.time, li.group_id.as_str())
+		} else {
+			(0, "none")
+		};
+
+		Ok(get_invites_for_user(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			&last_time.to_string(),
+			last_id,
+			None,
+			None,
+		)
+		.await?)
+	}
+
+	pub async fn accept_group_invite(&mut self, group_id_to_accept: &str, c: &L1Cache) -> Result<(), SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		Ok(accept_invite(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			group_id_to_accept,
+			None,
+			None,
+		)
+		.await?)
+	}
+
+	pub async fn reject_group_invite(&mut self, group_id_to_reject: &str, c: &L1Cache) -> Result<(), SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		Ok(reject_invite(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			group_id_to_reject,
+			None,
+			None,
+		)
+		.await?)
+	}
+
+	pub async fn group_join_request(&mut self, group_id_to_join: &str, c: &L1Cache) -> Result<(), SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		Ok(join_req(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			group_id_to_join,
+			None,
+			None,
+		)
+		.await?)
+	}
+
+	pub async fn delete_join_req(&mut self, id: &str, c: &L1Cache) -> Result<(), SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		Ok(delete_sent_join_req(self.base_url.clone(), &self.app_token, jwt, None, None, id, None).await?)
+	}
+
+	pub async fn get_sent_join_req(
+		&mut self,
+		c: &L1Cache,
+		last_fetched_item: Option<&GroupInviteReqList>,
+	) -> Result<Vec<GroupInviteReqList>, SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		let (last_time, last_id) = if let Some(li) = last_fetched_item {
+			(li.time, li.group_id.as_str())
+		} else {
+			(0, "none")
+		};
+
+		Ok(get_sent_join_req(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			None,
+			None,
+			&last_time.to_string(),
+			last_id,
+			None,
+		)
+		.await?)
 	}
 
 	//==============================================================================================

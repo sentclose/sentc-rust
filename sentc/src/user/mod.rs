@@ -10,6 +10,7 @@ use sentc_crypto::entities::keys::{
 	VerifyKeyFormatInt,
 };
 use sentc_crypto::entities::user::{UserDataInt, UserKeyDataInt};
+use sentc_crypto::group::prepare_create;
 use sentc_crypto::sdk_common::group::GroupHmacData;
 use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
 use sentc_crypto::sdk_common::{DeviceId, SymKeyId, UserId};
@@ -230,6 +231,14 @@ impl User
 		decrypt_hmac_key!(&user_key.group_key, self, hmac_key);
 
 		Ok(())
+	}
+
+	pub fn prepare_create_group(&self) -> Result<String, SentcError>
+	{
+		Ok(prepare_create(
+			self.get_newest_public_key()
+				.ok_or(SentcError::KeyNotFound)?,
+		)?)
 	}
 
 	fn set_newest_key_id(&mut self, id: SymKeyId)
