@@ -95,7 +95,7 @@ impl User
 		))
 	}
 
-	pub fn get_non_registered_key(&self, master_key_id: &str, server_out: &str) -> Result<SymKeyFormatInt, SentcError>
+	pub fn get_non_registered_key_sync(&self, master_key_id: &str, server_out: &str) -> Result<SymKeyFormatInt, SentcError>
 	{
 		let key = self
 			.get_user_keys(master_key_id)
