@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use sentc_crypto::crypto::{
 	decrypt_raw_symmetric,
 	decrypt_raw_symmetric_with_aad,
@@ -16,14 +14,13 @@ use sentc_crypto::crypto::{
 	split_head_and_encrypted_string,
 };
 use sentc_crypto::sdk_common::crypto::EncryptedHead;
-use sentc_crypto::sdk_common::user::UserVerifyKeyData;
 use sentc_crypto_utils::keys::SymKeyFormatInt;
 
 use crate::cache::l_one::L1Cache;
 use crate::error::SentcError;
 use crate::group::Group;
 use crate::group_key;
-use crate::net_helper::get_user_verify_key_data;
+use crate::net_helper::get_verify_key_internally_for_decrypt;
 
 macro_rules! opt_sign {
 	($self:expr, $c:expr, $sign:expr, |$sign_key:ident| $scope:block) => {
@@ -46,26 +43,6 @@ macro_rules! opt_sign {
 
 impl Group
 {
-	async fn get_verify_key(
-		&self,
-		head: &EncryptedHead,
-		verify: bool,
-		user_id: Option<&str>,
-		c: &L1Cache,
-	) -> Result<Option<Arc<UserVerifyKeyData>>, SentcError>
-	{
-		let verify_key = match (verify, user_id, &head.sign) {
-			(true, Some(id), Some(sh)) => {
-				let k = get_user_verify_key_data(&self.base_url, &self.app_token, id, &sh.id, c).await?;
-
-				Some(k)
-			},
-			_ => None,
-		};
-
-		Ok(verify_key)
-	}
-
 	//raw encrypt
 
 	pub async fn encrypt_raw(&self, data: &[u8], sign: bool, c: &L1Cache) -> Result<(EncryptedHead, Vec<u8>), SentcError>
@@ -88,7 +65,7 @@ impl Group
 	{
 		let key = group_key!(self, &head.id, c)?;
 
-		let verify_key = self.get_verify_key(head, verify, user_id, c).await?;
+		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
 		Ok(decrypt_raw_symmetric(
 			&key.group_key,
@@ -122,7 +99,7 @@ impl Group
 	{
 		let key = group_key!(self, &head.id, c)?;
 
-		let verify_key = self.get_verify_key(head, verify, user_id, c).await?;
+		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
 		Ok(decrypt_raw_symmetric_with_aad(
 			&key.group_key,
@@ -189,7 +166,7 @@ impl Group
 
 		let key = group_key!(self, &head.id, c)?;
 
-		let verify_key = self.get_verify_key(&head, verify, user_id, c).await?;
+		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
 		Ok(decrypt_string_symmetric(&key.group_key, data, verify_key.as_deref())?)
 	}
@@ -224,7 +201,7 @@ impl Group
 
 		let key = group_key!(self, &head.id, c)?;
 
-		let verify_key = self.get_verify_key(&head, verify, user_id, c).await?;
+		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
 		Ok(decrypt_string_symmetric_with_aad(
 			&key.group_key,
