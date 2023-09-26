@@ -3,8 +3,6 @@ use sentc_crypto::crypto::{
 	decrypt_raw_symmetric_with_aad,
 	decrypt_string_symmetric,
 	decrypt_string_symmetric_with_aad,
-	decrypt_symmetric,
-	decrypt_symmetric_with_aad,
 	done_fetch_sym_key,
 	encrypt_raw_symmetric,
 	encrypt_raw_symmetric_with_aad,
@@ -99,11 +97,7 @@ impl Group
 	{
 		let (head, data) = split_head_and_encrypted_data(data)?;
 
-		let key = self
-			.get_group_key(&head.id)
-			.ok_or(SentcError::KeyNotFound)?;
-
-		Ok(decrypt_symmetric(&key.group_key, data, verify_key)?)
+		self.decrypt_raw_sync(&head, data, verify_key)
 	}
 
 	//______________________________________________________________________________________________
@@ -120,11 +114,7 @@ impl Group
 	{
 		let (head, data) = split_head_and_encrypted_data(data)?;
 
-		let key = self
-			.get_group_key(&head.id)
-			.ok_or(SentcError::KeyNotFound)?;
-
-		Ok(decrypt_symmetric_with_aad(&key.group_key, data, aad, verify_key)?)
+		self.decrypt_raw_with_aad_sync(&head, data, aad, verify_key)
 	}
 
 	//______________________________________________________________________________________________
