@@ -1,3 +1,4 @@
+pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
 
