@@ -27,7 +27,6 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 sentc-ear-core = {workspace = true, optional=true}
 
 # network dependencies
-sentc-crypto-utils = {workspace = true, optional=true}
 sentc-crypto-full = {workspace = true, optional=true}
 
 tokio = {version = "1.32.0", features = ["sync"], default-features = false, optional=true}
@@ -36,5 +35,5 @@ tokio = {version = "1.32.0", features = ["sync"], default-features = false, opti
 tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false}
 
 [features]
-network = ["sentc-crypto-utils", "sentc-crypto-full", "tokio"]
+network = ["sentc-crypto-full", "tokio"]
 ear = ["sentc-ear-core"]
