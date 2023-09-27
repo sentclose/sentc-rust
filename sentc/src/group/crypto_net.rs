@@ -13,8 +13,8 @@ use sentc_crypto::crypto::{
 	split_head_and_encrypted_data,
 	split_head_and_encrypted_string,
 };
+use sentc_crypto::entities::keys::SymKeyFormatInt;
 use sentc_crypto::sdk_common::crypto::EncryptedHead;
-use sentc_crypto_utils::keys::SymKeyFormatInt;
 
 use crate::cache::l_one::L1Cache;
 use crate::error::SentcError;
