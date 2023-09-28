@@ -1,10 +1,9 @@
 use std::fs::Metadata;
 
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::entities::keys::{SignKeyFormatInt, SymKeyFormatInt};
 use sentc_crypto::sdk_common::crypto::GeneratedSymKeyHeadServerOutput;
 use sentc_crypto::sdk_common::file::BelongsToType;
 use sentc_crypto::sdk_core::SymKey;
-use sentc_crypto::sdk_utils::keys::SignKeyFormatInt;
 use sentc_crypto_full::file::{register_file, upload_part, upload_part_start};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
@@ -94,6 +93,10 @@ pub(crate) async fn check_file_upload(
 		}
 
 		index += 1;
+
+		if is_end {
+			break;
+		}
 	}
 
 	Ok(())
