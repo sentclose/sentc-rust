@@ -4,8 +4,6 @@ use sentc_crypto::SdkError;
 pub enum SentcError
 {
 	Sdk(SdkError),
-	#[cfg(feature = "ear")]
-	EarCore(sentc_ear_core::error::SdkEarError),
 
 	UserNotFound,
 	GroupNotFound,
@@ -50,14 +48,5 @@ impl From<sentc_crypto::sdk_core::Error> for SentcError
 	fn from(value: sentc_crypto::sdk_core::Error) -> Self
 	{
 		value.into()
-	}
-}
-
-#[cfg(feature = "ear")]
-impl From<sentc_ear_core::error::SdkEarError> for SentcError
-{
-	fn from(value: sentc_ear_core::error::SdkEarError) -> Self
-	{
-		Self::EarCore(value)
 	}
 }
