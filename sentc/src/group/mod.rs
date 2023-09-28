@@ -1,8 +1,6 @@
 #[cfg(feature = "network")]
 pub mod crypto_net;
 pub mod crypto_sync;
-#[cfg(feature = "ear")]
-pub mod ear;
 #[cfg(feature = "file")]
 pub mod file;
 #[cfg(feature = "network")]

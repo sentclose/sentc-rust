@@ -23,8 +23,6 @@ sentc-crypto-common = { path = "../../backend/sentc-api/sdk-common" }    # for l
 #sentc-crypto-full = {version = "0.10.0", git = "https://github.com/sentclose/sentc.git", rev="ad3a44c59bae5867c5a2a95a7f066890673904ca", features = ["rustls",  "rust"]}
 sentc-crypto-full = {path = "../../sdk/crypto_full", features = ["rustls", "rust"]} # for local dev
 
-sentc-ear-core = {path = "../../ear/sentc-ear/sentc-ear-core"} # for local dev
-
 # workspace packages
 
 sentc = {version = "0.1.0", path = "sentc"}

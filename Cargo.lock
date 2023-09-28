@@ -867,7 +867,6 @@ version = "0.1.0"
 dependencies = [
  "sentc-crypto",
  "sentc-crypto-full",
- "sentc-ear-core",
  "serde",
  "serde_json",
  "tokio",
@@ -931,16 +930,6 @@ dependencies = [
  "reqwest",
  "sentc-crypto-common",
  "sentc-crypto-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "sentc-ear-core"
-version = "0.1.0"
-dependencies = [
- "base64ct",
- "sentc-crypto",
  "serde",
  "serde_json",
 ]

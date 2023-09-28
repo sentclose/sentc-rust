@@ -23,9 +23,6 @@ sentc-crypto = {workspace=true, features = ["rust"]}
 serde_json = {version = "1.0.81", default-features = false, features = ["alloc"]}
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"]}
 
-# Encrypted at rest
-sentc-ear-core = {workspace = true, optional=true}
-
 # network dependencies
 sentc-crypto-full = {workspace = true, optional=true}
 
@@ -36,5 +33,4 @@ tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-m
 
 [features]
 network = ["sentc-crypto-full", "tokio"]
-ear = ["sentc-ear-core"]
 file = ["tokio/fs"]
