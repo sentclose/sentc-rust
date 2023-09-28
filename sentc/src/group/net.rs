@@ -153,6 +153,25 @@ macro_rules! group_key {
 	};
 }
 
+macro_rules! group_key_internally {
+	($self:expr,$key_id:expr, $user:expr, $c:expr) => {
+		match $self.get_group_key($key_id) {
+			Some(k) => Ok(k),
+			None => {
+				$self
+					.fetch_group_key_internally($key_id, $user, false, $c)
+					.await?;
+
+				$self
+					.get_group_key($key_id)
+					.ok_or($crate::error::SentcError::KeyNotFound)
+			},
+		}
+	};
+}
+
+pub(super) use group_key_internally;
+
 impl Group
 {
 	pub async fn get_child_group(&self, group_id: &str, c: &L1Cache) -> Result<Arc<RwLock<Group>>, SentcError>
@@ -1194,7 +1213,7 @@ impl Group
 		Ok(())
 	}
 
-	fn fetch_group_key_internally<'a>(
+	pub(super) fn fetch_group_key_internally<'a>(
 		&'a mut self,
 		group_key_id: &'a str,
 		user: &'a mut User,

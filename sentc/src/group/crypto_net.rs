@@ -19,7 +19,6 @@ use sentc_crypto::sdk_common::crypto::EncryptedHead;
 use crate::cache::l_one::L1Cache;
 use crate::error::SentcError;
 use crate::group::Group;
-use crate::group_key;
 use crate::net_helper::get_verify_key_internally_for_decrypt;
 
 macro_rules! opt_sign {
@@ -39,6 +38,19 @@ macro_rules! opt_sign {
 			$scope
 		}
 	};
+}
+
+macro_rules! user_to_group_key {
+	($self:expr, $c:expr, $key_id:expr) => {{
+		let user = $c
+			.get_user(&$self.used_user_id)
+			.await
+			.ok_or(SentcError::UserNotFound)?;
+
+		let mut user = user.write().await;
+
+		$crate::group::net::group_key_internally!($self, $key_id, &mut user, $c)
+	}};
 }
 
 impl Group
@@ -63,7 +75,7 @@ impl Group
 		c: &L1Cache,
 	) -> Result<Vec<u8>, SentcError>
 	{
-		let key = group_key!(self, &head.id, c)?;
+		let key = user_to_group_key!(self, c, &head.id)?;
 
 		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
@@ -97,7 +109,7 @@ impl Group
 		c: &L1Cache,
 	) -> Result<Vec<u8>, SentcError>
 	{
-		let key = group_key!(self, &head.id, c)?;
+		let key = user_to_group_key!(self, c, &head.id)?;
 
 		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
@@ -164,7 +176,7 @@ impl Group
 	{
 		let head = split_head_and_encrypted_string(data)?;
 
-		let key = group_key!(self, &head.id, c)?;
+		let key = user_to_group_key!(self, c, &head.id)?;
 
 		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
@@ -199,7 +211,7 @@ impl Group
 	{
 		let head = split_head_and_encrypted_string(data)?;
 
-		let key = group_key!(self, &head.id, c)?;
+		let key = user_to_group_key!(self, c, &head.id)?;
 
 		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
@@ -216,7 +228,7 @@ impl Group
 
 	pub async fn get_non_registered_key(&mut self, master_key_id: &str, server_output: &str, c: &L1Cache) -> Result<SymKeyFormatInt, SentcError>
 	{
-		let key = group_key!(self, master_key_id, c)?;
+		let key = user_to_group_key!(self, c, master_key_id)?;
 
 		Ok(done_fetch_sym_key(&key.group_key, server_output, true)?)
 	}
