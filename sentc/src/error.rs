@@ -1,3 +1,5 @@
+use std::io;
+
 use sentc_crypto::SdkError;
 
 #[derive(Debug)]
@@ -22,6 +24,9 @@ pub enum SentcError
 	TimeError,
 	JsonToStringFailed,
 	JsonParseFailed(serde_json::Error),
+
+	#[cfg(feature = "file")]
+	FileReadError(io::Error),
 }
 
 impl From<SdkError> for SentcError

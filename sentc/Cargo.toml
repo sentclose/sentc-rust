@@ -37,3 +37,4 @@ tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-m
 [features]
 network = ["sentc-crypto-full", "tokio"]
 ear = ["sentc-ear-core"]
+file = ["tokio/fs"]
