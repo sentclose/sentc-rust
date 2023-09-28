@@ -244,6 +244,13 @@ impl Group
 		self.access_by_group_as_member.as_ref()
 	}
 
+	pub fn get_newest_key(&self) -> Option<&GroupKeyData>
+	{
+		let index = self.key_map.get(&self.newest_key_id).unwrap_or(&0);
+
+		self.keys.get(*index)
+	}
+
 	//______________________________________________________________________________________________
 	//searchable encryption
 
@@ -316,13 +323,6 @@ impl Group
 	pub(crate) fn set_newest_key_id(&mut self, id: SymKeyId)
 	{
 		self.newest_key_id = id;
-	}
-
-	pub(crate) fn get_newest_key(&self) -> Option<&GroupKeyData>
-	{
-		let index = self.key_map.get(&self.newest_key_id).unwrap_or(&0);
-
-		self.keys.get(*index)
 	}
 
 	pub fn set_hmac_key(&mut self, key: &GroupKeyData, hmac_key: GroupHmacData) -> Result<(), SentcError>
