@@ -15,7 +15,7 @@ use sentc_crypto::crypto::{
 	split_head_and_encrypted_string,
 };
 use sentc_crypto::entities::keys::{SignKeyFormatInt, SymKeyFormatInt};
-use sentc_crypto::sdk_common::crypto::EncryptedHead;
+use sentc_crypto::sdk_common::crypto::{EncryptedHead, GeneratedSymKeyHeadServerOutput};
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
 
 use crate::error::SentcError;
@@ -172,18 +172,13 @@ impl Group
 	//==============================================================================================
 	//sym key
 
-	pub fn generate_non_registered_key(&self) -> Result<(SymKeyFormatInt, String), SentcError>
+	pub fn generate_non_registered_key(&self) -> Result<(SymKeyFormatInt, GeneratedSymKeyHeadServerOutput), SentcError>
 	{
 		let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
 		let (raw_key, key_out) = generate_non_register_sym_key(&key.group_key)?;
 
-		Ok((
-			raw_key,
-			key_out
-				.to_string()
-				.map_err(|_| SentcError::JsonToStringFailed)?,
-		))
+		Ok((raw_key, key_out))
 	}
 
 	pub fn get_non_registered_key_sync(&self, master_key_id: &str, server_output: &str) -> Result<SymKeyFormatInt, SentcError>
