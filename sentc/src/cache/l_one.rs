@@ -15,6 +15,9 @@ pub(crate) type GroupInnerMap = HashMap<GroupId, Arc<RwLock<Group>>>;
 pub(crate) type GroupMap = HashMap<UserId, GroupInnerMap>;
 
 #[derive(Default)]
+pub(crate) struct ActualUserId(pub(crate) UserId);
+
+#[derive(Default)]
 pub struct L1Cache
 {
 	groups: RwLock<GroupMap>,
@@ -22,7 +25,9 @@ pub struct L1Cache
 	user_public_keys: RwLock<HashMap<UserId, Arc<UserPublicKeyData>>>,
 	user_verify_keys: RwLock<HashMap<UserId, HashMap<String, Arc<UserVerifyKeyData>>>>,
 	group_public_keys: RwLock<HashMap<GroupId, Arc<UserPublicKeyData>>>,
-	actual_user: RwLock<UserId>,
+	actual_user: RwLock<ActualUserId>,
+
+	pub(crate) file_part_url: Option<String>,
 }
 
 impl L1Cache
@@ -83,6 +88,18 @@ impl L1Cache
 	}
 
 	//______________________________________________________________________________________________
+
+	pub(crate) fn get_actual_user(&self) -> &RwLock<ActualUserId>
+	{
+		&self.actual_user
+	}
+
+	pub async fn set_actual_user(&self, user_id: String)
+	{
+		let mut lock = self.actual_user.write().await;
+
+		lock.0 = user_id;
+	}
 
 	pub async fn get_user(&self, user_id: &str) -> Option<Arc<RwLock<User>>>
 	{
