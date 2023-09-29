@@ -21,6 +21,9 @@ pub enum SentcError
 	JsonToStringFailed,
 	JsonParseFailed(serde_json::Error),
 
+	UsernameOrPasswordRequired,
+	UserMfaRequired,
+
 	#[cfg(feature = "file")]
 	FileReadError(std::io::Error),
 	#[cfg(feature = "file")]
