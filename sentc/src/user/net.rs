@@ -62,27 +62,12 @@ macro_rules! get_user_private_key {
 	};
 }
 
-macro_rules! get_user_public_key {
-	($key_id:expr, $self:expr, $c:expr, |$public_key:ident| $scope:block) => {
-		get_user_key!($key_id, $self, $c, |key| {
-			let $public_key = &key.public_key;
-			$scope
-		})
-	};
-}
-
-pub(crate) use {get_user_key, get_user_private_key, get_user_public_key};
+pub(crate) use {get_user_key, get_user_private_key};
 
 use crate::net_helper::get_time;
 
 impl User
 {
-	pub fn new() -> Self
-	{
-		//TODO remove
-		todo!()
-	}
-
 	pub async fn get_group(
 		&mut self,
 		group_id: &str,
