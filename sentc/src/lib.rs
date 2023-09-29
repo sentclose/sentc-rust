@@ -1,9 +1,12 @@
 #[cfg(feature = "network")]
 pub mod cache;
 pub mod error;
+#[cfg(feature = "file")]
+pub mod file;
 pub mod group;
 #[cfg(feature = "network")]
 mod net_helper;
+pub mod sentc;
 pub mod user;
 
 use std::collections::HashMap;
