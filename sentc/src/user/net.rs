@@ -379,7 +379,7 @@ impl User
 
 		delete(self.base_url.clone(), &self.app_token, &jwt).await?;
 
-		c.delete_user(self.get_user_id()).await?;
+		self.logout(c).await?;
 
 		Ok(())
 	}
@@ -399,6 +399,11 @@ impl User
 		delete_device(self.base_url.clone(), &self.app_token, &jwt, device_id).await?;
 
 		Ok(())
+	}
+
+	pub async fn logout(&self, c: &L1Cache) -> Result<(), SentcError>
+	{
+		c.delete_user(self.get_user_id()).await
 	}
 
 	//==============================================================================================
