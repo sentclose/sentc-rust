@@ -4,6 +4,7 @@ use sentc_crypto::crypto::decrypt_string_symmetric;
 use sentc_crypto::entities::keys::SymKeyFormatInt;
 use sentc_crypto::sdk_common::file::FileData;
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
+use sentc_crypto_full::file::{delete_file, update_file_name};
 use tokio::fs::File;
 
 use crate::cache::l_one::L1Cache;
@@ -79,7 +80,7 @@ impl Group
 			upload_callback,
 			Some(self.get_group_id()),
 			None,
-			self.access_by_group_as_member.as_deref(),
+			self.get_access_group_as_member(),
 		)
 		.await?;
 
@@ -174,7 +175,7 @@ impl Group
 			jwt,
 			file_id,
 			Some(self.get_group_id()),
-			self.access_by_group_as_member.as_deref(),
+			self.get_access_group_as_member(),
 		)
 		.await?;
 
@@ -376,5 +377,57 @@ impl Group
 			key: content_key,
 			file_name: Some(file_name),
 		})
+	}
+
+	//______________________________________________________________________________________________
+
+	pub async fn update_file_name(
+		&self,
+		file_id: &str,
+		content_key: &SymKeyFormatInt,
+		file_name: Option<String>,
+		c: &L1Cache,
+	) -> Result<(), SentcError>
+	{
+		let user = c
+			.get_user(&self.used_user_id)
+			.await
+			.ok_or(SentcError::UserNotFound)?;
+
+		let mut user_write = user.write().await;
+
+		let jwt = user_write.get_jwt(c).await?;
+
+		Ok(update_file_name(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			file_id,
+			content_key,
+			file_name,
+		)
+		.await?)
+	}
+
+	pub async fn delete_file(&self, file_id: &str, c: &L1Cache) -> Result<(), SentcError>
+	{
+		let user = c
+			.get_user(&self.used_user_id)
+			.await
+			.ok_or(SentcError::UserNotFound)?;
+
+		let mut user_write = user.write().await;
+
+		let jwt = user_write.get_jwt(c).await?;
+
+		Ok(delete_file(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			file_id,
+			Some(self.get_group_id()),
+			self.get_access_group_as_member(),
+		)
+		.await?)
 	}
 }
