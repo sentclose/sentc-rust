@@ -16,6 +16,8 @@ struct DeviceState
 }
 
 static USER_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
+static USER_2_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
+static USER_3_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
 
 static DEVICE_PRE_TEST_STATE: OnceCell<DeviceState> = OnceCell::const_new();
 static DEVICE_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
@@ -417,10 +419,159 @@ async fn test_44_not_login_with_deleted_device()
 	}
 }
 
+#[tokio::test]
+async fn test_50_create_safety_number()
+{
+	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let u_read = u.0.read().await;
+
+	u_read.create_safety_number_sync(None, None).unwrap();
+	u_read
+		.create_safety_number(None, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+}
+
+#[tokio::test]
+async fn test_51_create_more_users()
+{
+	let sentc = SENTC.get().unwrap();
+
+	//create the 2nd user
+
+	let user_id = sentc
+		.register(&(USERNAME.to_string() + "1"), PW)
+		.await
+		.unwrap();
+
+	let user = sentc
+		.login_forced(&(USERNAME.to_string() + "1"), PW)
+		.await
+		.unwrap();
+
+	let u_read = user.read().await;
+
+	assert_eq!(user_id, u_read.get_user_id());
+
+	drop(u_read);
+
+	USER_2_TEST_STATE
+		.get_or_init(|| async move { RwLock::new(UserState(user)) })
+		.await;
+
+	//create the 3rd user
+
+	let user_id = sentc
+		.register(&(USERNAME.to_string() + "2"), PW)
+		.await
+		.unwrap();
+
+	let user = sentc
+		.login_forced(&(USERNAME.to_string() + "2"), PW)
+		.await
+		.unwrap();
+
+	let u_read = user.read().await;
+
+	assert_eq!(user_id, u_read.get_user_id());
+
+	drop(u_read);
+
+	USER_3_TEST_STATE
+		.get_or_init(|| async move { RwLock::new(UserState(user)) })
+		.await;
+}
+
+#[tokio::test]
+async fn test_52_create_combined_safety_number()
+{
+	//with user 2
+	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let u_read = u.0.read().await;
+
+	let u1 = USER_2_TEST_STATE.get().unwrap().read().await;
+	let u1_read = u1.0.read().await;
+
+	let n1 = u_read
+		.create_safety_number(
+			Some(u1_read.get_user_id()),
+			Some(&u1_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	let n2 = u1_read
+		.create_safety_number(
+			Some(u_read.get_user_id()),
+			Some(&u_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	assert_eq!(n1, n2);
+}
+
+#[tokio::test]
+async fn test_53_not_create_the_same_number_with_different_user()
+{
+	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let u_read = u.0.read().await;
+
+	let u1 = USER_2_TEST_STATE.get().unwrap().read().await;
+	let u1_read = u1.0.read().await;
+
+	let u2 = USER_3_TEST_STATE.get().unwrap().read().await;
+	let u2_read = u2.0.read().await;
+
+	let n1 = u_read
+		.create_safety_number(
+			Some(u1_read.get_user_id()),
+			Some(&u1_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	let n2 = u1_read
+		.create_safety_number(
+			Some(u_read.get_user_id()),
+			Some(&u_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	assert_eq!(n1, n2);
+
+	let n3 = u2_read
+		.create_safety_number(
+			Some(u_read.get_user_id()),
+			Some(&u_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	assert_ne!(n1, n3);
+
+	let n4 = u_read
+		.create_safety_number(
+			Some(u2_read.get_user_id()),
+			Some(&u2_read.get_newest_key().unwrap().verify_key.key_id),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	assert_eq!(n3, n4);
+}
+
 /*
 TODO:
-	- safety number (with multiple users
 	- verify public key
+	- logout
  */
 
 #[tokio::test]
@@ -428,6 +579,20 @@ async fn zzz_clean_up()
 {
 	let u = USER_TEST_STATE.get().unwrap().read().await;
 
+	let ur = u.0.read().await;
+
+	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let u = USER_2_TEST_STATE.get().unwrap().read().await;
+	let ur = u.0.read().await;
+
+	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let u = USER_3_TEST_STATE.get().unwrap().read().await;
 	let ur = u.0.read().await;
 
 	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
