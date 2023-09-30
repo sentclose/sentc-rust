@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
+use sentc_crypto::user::verify_user_public_key;
 use sentc_crypto_full::user::{
 	check_user_identifier_available,
 	login,
@@ -240,5 +241,18 @@ impl Sentc
 			self.get_cache(),
 		)
 		.await
+	}
+
+	pub async fn verify_user_public_key(&self, user_id: &str, public_key: &UserPublicKeyData) -> Result<bool, SentcError>
+	{
+		if let (Some(_sig), Some(key_id)) = (&public_key.public_key_sig, &public_key.public_key_sig_key_id) {
+			let verify_key = self.get_user_verify_key_data(user_id, key_id).await?;
+
+			let verify = verify_user_public_key(&verify_key, public_key)?;
+
+			Ok(verify)
+		} else {
+			Ok(false)
+		}
 	}
 }
