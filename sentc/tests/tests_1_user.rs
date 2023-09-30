@@ -568,9 +568,37 @@ async fn test_53_not_create_the_same_number_with_different_user()
 	assert_eq!(n3, n4);
 }
 
+#[tokio::test]
+async fn test_54_verify_public_key()
+{
+	//create test user but not login because the own verify key would be set a verified
+	let user_id = SENTC
+		.get()
+		.unwrap()
+		.register(&(USERNAME.to_string() + "3"), PW)
+		.await
+		.unwrap();
+
+	let public_key = SENTC
+		.get()
+		.unwrap()
+		.get_user_public_key_data(&user_id)
+		.await
+		.unwrap();
+
+	//verify this key
+	let verify = SENTC
+		.get()
+		.unwrap()
+		.verify_user_public_key(&user_id, &public_key)
+		.await
+		.unwrap();
+
+	assert!(verify);
+}
+
 /*
 TODO:
-	- verify public key
 	- logout
  */
 
@@ -596,6 +624,20 @@ async fn zzz_clean_up()
 	let ur = u.0.read().await;
 
 	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	//delete the not logged in user
+	let user = SENTC
+		.get()
+		.unwrap()
+		.login_forced(&(USERNAME.to_string() + "3"), PW)
+		.await
+		.unwrap();
+
+	user.write()
+		.await
+		.delete(PW, None, None, SENTC.get().unwrap().get_cache())
 		.await
 		.unwrap();
 }
