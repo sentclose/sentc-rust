@@ -70,7 +70,7 @@ impl Group
 			file,
 			file_name,
 			&self.base_url,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			&self.app_token,
 			jwt,
 			&key,
@@ -148,8 +148,8 @@ impl Group
 	pub async fn get_file_meta(
 		&mut self,
 		file_id: &str,
-		c: &L1Cache,
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<(FileData, SymKeyFormatInt, Option<String>), SentcError>
 	{
 		let user = c
@@ -201,13 +201,14 @@ impl Group
 		file_meta: FileData,
 		content_key: &SymKeyFormatInt,
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<(), SentcError>
 	{
 		download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			content_key,
 			&file_meta.part_list,
 			None::<DefaultCallback>,
@@ -223,13 +224,14 @@ impl Group
 		content_key: &SymKeyFormatInt,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<(), SentcError>
 	{
 		download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			content_key,
 			&file_meta.part_list,
 			Some(upload_callback),
@@ -242,17 +244,17 @@ impl Group
 		&mut self,
 		file: File,
 		file_id: &str,
-		c: &L1Cache,
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<FileDownloadOutput, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, c, verify_key).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
 
 		download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			&content_key,
 			&meta.part_list,
 			None::<DefaultCallback>,
@@ -271,18 +273,18 @@ impl Group
 		&mut self,
 		file: File,
 		file_id: &str,
-		c: &L1Cache,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<FileDownloadOutput, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, c, verify_key).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
 
 		download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			&content_key,
 			&meta.part_list,
 			Some(upload_callback),
@@ -301,11 +303,11 @@ impl Group
 		&mut self,
 		path: &str,
 		file_id: &str,
-		c: &L1Cache,
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<FileDownloadOutput, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, c, verify_key).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
 
 		let file_name = decrypted_file_name.as_deref().unwrap_or("file");
 
@@ -321,7 +323,7 @@ impl Group
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			&content_key,
 			&meta.part_list,
 			None::<DefaultCallback>,
@@ -340,12 +342,12 @@ impl Group
 		&mut self,
 		path: &str,
 		file_id: &str,
-		c: &L1Cache,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
+		c: &L1Cache,
 	) -> Result<FileDownloadOutput, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, c, verify_key).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
 
 		let file_name = decrypted_file_name.as_deref().unwrap_or("file");
 
@@ -361,7 +363,7 @@ impl Group
 			file,
 			&self.base_url,
 			&self.app_token,
-			None, //TODO get it from global option
+			c.file_part_url.clone(),
 			&content_key,
 			&meta.part_list,
 			Some(upload_callback),
