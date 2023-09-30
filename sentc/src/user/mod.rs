@@ -17,7 +17,7 @@ use sentc_crypto::group::prepare_create;
 use sentc_crypto::sdk_common::group::GroupHmacData;
 use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
 use sentc_crypto::sdk_common::{DeviceId, SymKeyId, UserId};
-use sentc_crypto::user::prepare_register_device;
+use sentc_crypto::user::{create_safety_number, prepare_register_device};
 
 use crate::error::SentcError;
 use crate::group::prepare_group_keys_ref;
@@ -241,6 +241,19 @@ impl User
 		Ok(prepare_create(
 			self.get_newest_public_key()
 				.ok_or(SentcError::KeyNotFound)?,
+		)?)
+	}
+
+	pub fn create_safety_number_sync(&self, other_user: Option<&str>, other_user_key: Option<&UserVerifyKeyData>) -> Result<String, SentcError>
+	{
+		Ok(create_safety_number(
+			&self
+				.get_newest_key()
+				.ok_or(SentcError::KeyNotFound)?
+				.exported_verify_key,
+			self.get_user_id(),
+			other_user_key,
+			other_user,
 		)?)
 	}
 

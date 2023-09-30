@@ -64,7 +64,7 @@ macro_rules! get_user_private_key {
 
 pub(crate) use {get_user_key, get_user_private_key};
 
-use crate::net_helper::get_time;
+use crate::net_helper::{get_time, get_user_verify_key_data};
 
 impl User
 {
@@ -559,6 +559,26 @@ impl User
 		c.update_cache_layer_for_user(self.get_user_id()).await?;
 
 		Ok(())
+	}
+
+	//==============================================================================================
+
+	pub async fn create_safety_number(
+		&self,
+		other_user_id: Option<&str>,
+		other_user_verify_key_id: Option<&str>,
+		c: &L1Cache,
+	) -> Result<String, SentcError>
+	{
+		let verify_key = if let (Some(id), Some(k_id)) = (other_user_id, other_user_verify_key_id) {
+			let k = get_user_verify_key_data(&self.base_url, &self.app_token, id, k_id, c).await?;
+
+			Some(k)
+		} else {
+			None
+		};
+
+		self.create_safety_number_sync(other_user_id, verify_key.as_deref())
 	}
 
 	//==============================================================================================
