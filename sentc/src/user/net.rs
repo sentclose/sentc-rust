@@ -544,7 +544,7 @@ impl User
 				)
 				.await?;
 
-				self.fetch_user_key_internally(&key_id, false, c).await?;
+				self.fetch_user_key_internally(&key_id, true, c).await?;
 			}
 
 			//end of the for loop
