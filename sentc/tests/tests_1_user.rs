@@ -89,7 +89,10 @@ async fn test_12_change_password()
 		.await
 		.unwrap();
 
-	//TODO logout the user
+	u_write
+		.logout(SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
 }
 
 #[tokio::test]
@@ -138,7 +141,10 @@ async fn test_15_reset_password()
 		.await
 		.unwrap();
 
-	//TODO log out again
+	u_write
+		.logout(SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
 }
 
 #[tokio::test]
@@ -596,11 +602,6 @@ async fn test_54_verify_public_key()
 
 	assert!(verify);
 }
-
-/*
-TODO:
-	- logout
- */
 
 #[tokio::test]
 async fn zzz_clean_up()
