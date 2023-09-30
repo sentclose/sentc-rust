@@ -603,6 +603,90 @@ async fn test_54_verify_public_key()
 	assert!(verify);
 }
 
+//__________________________________________________________________________________________________
+//encrypt tests
+
+const STRING_DATA: &str = "hello there £ Я a a";
+
+#[tokio::test]
+async fn test_60_encrypt_data_for_other_user()
+{
+	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let mut uw = u.0.write().await;
+
+	let u1 = USER_2_TEST_STATE.get().unwrap().read().await;
+	let mut uw1 = u1.0.write().await;
+
+	let encrypted_string = uw
+		.encrypt_string(
+			STRING_DATA,
+			uw1.get_user_id(),
+			false,
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	//should not decrypt it again because it was decrypted by the other users public key
+
+	let err = uw
+		.decrypt_string(&encrypted_string, false, None, SENTC.get().unwrap().get_cache())
+		.await;
+
+	match err {
+		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+			assert_eq!(c, 304);
+		},
+		_ => panic!("should be error"),
+	}
+
+	//decrypt with the right user
+
+	let str = uw1
+		.decrypt_string(&encrypted_string, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(str, STRING_DATA);
+}
+
+#[tokio::test]
+async fn test_61_encrypt_data_for_other_user_with_sign()
+{
+	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let uw = u.0.read().await;
+
+	let u1 = USER_2_TEST_STATE.get().unwrap().read().await;
+	let mut uw1 = u1.0.write().await;
+
+	let encrypted_string = uw
+		.encrypt_string(STRING_DATA, uw1.get_user_id(), true, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	//decrypt it without sign
+
+	let str = uw1
+		.decrypt_string(&encrypted_string, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(str, STRING_DATA);
+
+	//decrypt now with sign
+	let str = uw1
+		.decrypt_string(
+			&encrypted_string,
+			true,
+			Some(uw.get_user_id()),
+			SENTC.get().unwrap().get_cache(),
+		)
+		.await
+		.unwrap();
+
+	assert_eq!(str, STRING_DATA);
+}
+
 #[tokio::test]
 async fn zzz_clean_up()
 {
