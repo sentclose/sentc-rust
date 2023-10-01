@@ -1,11 +1,19 @@
 use std::sync::Arc;
 
 use sentc_crypto::entities::user::UserDataInt;
-use sentc_crypto::sdk_common::group::{GroupHmacData, GroupInviteReqList};
+use sentc_crypto::sdk_common::group::{GroupHmacData, GroupInviteReqList, ListGroups};
 use sentc_crypto::sdk_common::user::{OtpRegister, UserDeviceList};
 use sentc_crypto::sdk_common::GroupId;
 use sentc_crypto_full::decode_jwt;
-use sentc_crypto_full::group::{accept_invite, delete_sent_join_req, get_invites_for_user, get_sent_join_req, join_req, reject_invite};
+use sentc_crypto_full::group::{
+	accept_invite,
+	delete_sent_join_req,
+	get_groups_for_user,
+	get_invites_for_user,
+	get_sent_join_req,
+	join_req,
+	reject_invite,
+};
 use sentc_crypto_full::user::{
 	change_password,
 	delete,
@@ -113,6 +121,28 @@ impl User
 	}
 
 	//______________________________________________________________________________________________
+
+	pub async fn get_groups(&mut self, c: &L1Cache, last_item: Option<&ListGroups>) -> Result<Vec<ListGroups>, SentcError>
+	{
+		self.check_jwt(c).await?;
+		let jwt = &self.jwt;
+
+		let (last_time, last_id) = if let Some(li) = last_item {
+			(li.time, li.group_id.as_str())
+		} else {
+			(0, "none")
+		};
+
+		Ok(get_groups_for_user(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			last_time.to_string().as_str(),
+			last_id,
+			None,
+		)
+		.await?)
+	}
 
 	pub async fn get_group_invites(&mut self, c: &L1Cache, last_item: Option<&GroupInviteReqList>) -> Result<Vec<GroupInviteReqList>, SentcError>
 	{
