@@ -1138,7 +1138,7 @@ impl Group
 
 	async fn decrypt_group_keys(&mut self, user: &mut User, fetched_keys: GroupKeyServerOutput, c: &L1Cache) -> Result<(), SentcError>
 	{
-		let key_id = &fetched_keys.encrypted_private_group_key;
+		let key_id = &fetched_keys.user_public_key_id;
 		get_private_key!(key_id, user, self, c, |private_key| {
 			self.set_keys(private_key, fetched_keys)
 		})
