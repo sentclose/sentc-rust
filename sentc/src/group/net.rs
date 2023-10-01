@@ -384,7 +384,7 @@ impl Group
 		}
 
 		//hacky way to bypass rust mut borrowing rules.
-		let public_key = if self.from_parent && self.access_by_group_as_member.is_none() {
+		let public_key = if !self.from_parent && self.access_by_group_as_member.is_none() {
 			user.get_newest_public_key()
 				.ok_or(SentcError::KeyNotFound)?
 				.clone()
