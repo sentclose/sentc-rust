@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
+use sentc::cache::l_one::L1Cache;
 use sentc::error::SentcError;
 use sentc::group::Group;
 use sentc::sentc::Sentc;
@@ -745,7 +746,7 @@ async fn test_36_decrypt_both_strings()
 async fn test_37_not_kick_without_rights()
 {
 	let u = USER_2_TEST_STATE.get().unwrap().read().await;
-	let u_r = u.0.read().await;
+	let u_r = u.read().await;
 
 	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
 	let g = g.read().await;
@@ -760,13 +761,101 @@ async fn test_37_not_kick_without_rights()
 	}
 }
 
-/*
-TODO
-	- increase user rank (for 1 and 2)
-	- not kick user with higher rank
-	- kick user
-	- and not getting group after kick
+#[tokio::test]
+async fn test_38_increase_rank_for_user_1()
+{
+	let u = USER_1_TEST_STATE.get().unwrap().read().await;
+	let u_r = u.read().await;
 
+	let u1 = USER_2_TEST_STATE.get().unwrap().read().await;
+	let u1_r = u1.read().await;
+
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	g.update_rank(u_r.get_user_id(), 1, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	g.update_rank(u1_r.get_user_id(), 2, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	drop(u_r);
+	drop(u1_r);
+
+	//update the locale structs
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	g.group_update_check(SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let g = GROUP_2_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	g.group_update_check(SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+}
+
+#[tokio::test]
+async fn test_39_not_kick_a_user_with_higher_rank()
+{
+	let u = USER_1_TEST_STATE.get().unwrap().read().await;
+	let u_r = u.read().await;
+
+	let g = GROUP_2_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let err = g
+		.kick_user(u_r.get_user_id(), SENTC.get().unwrap().get_cache())
+		.await;
+
+	match err {
+		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+			assert_eq!(c, 316);
+		},
+		_ => panic!("should be error"),
+	}
+}
+
+#[tokio::test]
+async fn test_40_kick_a_user()
+{
+	let u = USER_2_TEST_STATE.get().unwrap().read().await;
+	let u_r = u.read().await;
+
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	g.kick_user(u_r.get_user_id(), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+}
+
+#[tokio::test]
+async fn test_41_not_get_the_group_after_kick()
+{
+	let u = USER_2_TEST_STATE.get().unwrap().read().await;
+	let mut u_w = u.write().await;
+
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	//use an empty cache here to not load the group from the cache
+	let err = u_w.get_group(g.get_group_id(), None, &L1Cache::new()).await;
+
+	match err {
+		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+			assert_eq!(c, 310);
+		},
+		_ => panic!("should be error"),
+	}
+}
+
+/*
 TODO
 	- child group
  */
