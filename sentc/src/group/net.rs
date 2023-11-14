@@ -15,6 +15,7 @@ use sentc_crypto_full::group::{
 	get_group,
 	get_group_key,
 	get_group_keys,
+	get_group_updates,
 	get_groups_for_user,
 	get_invites_for_user,
 	get_join_reqs,
@@ -290,6 +291,32 @@ impl Group
 		.await?;
 
 		Ok(group_id)
+	}
+
+	pub async fn group_update_check(&mut self, c: &L1Cache) -> Result<(), SentcError>
+	{
+		let user = c
+			.get_user(&self.used_user_id)
+			.await
+			.ok_or(SentcError::UserNotFound)?;
+
+		let mut user = user.write().await;
+
+		let jwt = user.get_jwt(c).await?;
+
+		let update = get_group_updates(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			&self.group_id,
+			self.access_by_group_as_member.as_deref(),
+		)
+		.await?;
+
+		self.rank = update.rank;
+		self.key_update = update.key_update;
+
+		Ok(())
 	}
 
 	pub async fn fetch_group_key(&mut self, group_key_id: &str, c: &L1Cache) -> Result<(), SentcError>
