@@ -3,7 +3,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use sentc_crypto::entities::group::GroupKeyData;
-use sentc_crypto::sdk_common::group::{GroupHmacData, GroupInviteReqList, GroupJoinReqList, GroupKeyServerOutput, GroupSortableData, ListGroups};
+use sentc_crypto::sdk_common::group::{
+	GroupChildrenList,
+	GroupHmacData,
+	GroupInviteReqList,
+	GroupJoinReqList,
+	GroupKeyServerOutput,
+	GroupSortableData,
+	ListGroups,
+};
 use sentc_crypto_full::group::{
 	accept_invite,
 	accept_join_req,
@@ -12,6 +20,7 @@ use sentc_crypto_full::group::{
 	delete_group,
 	delete_sent_join_req,
 	done_key_rotation,
+	get_all_first_level_children,
 	get_group,
 	get_group_key,
 	get_group_keys,
@@ -175,6 +184,28 @@ pub(super) use group_key_internally;
 
 impl Group
 {
+	pub async fn get_children(&self, last_fetched_item: Option<&GroupChildrenList>, c: &L1Cache) -> Result<Vec<GroupChildrenList>, SentcError>
+	{
+		user_jwt!(self, c, |jwt| {
+			let (last_time, last_id) = if let Some(li) = last_fetched_item {
+				(li.time, li.group_id.as_str())
+			} else {
+				(0, "none")
+			};
+
+			Ok(get_all_first_level_children(
+				self.base_url.clone(),
+				&self.app_token,
+				jwt,
+				self.get_group_id(),
+				&last_time.to_string(),
+				last_id,
+				self.get_access_group_as_member(),
+			)
+			.await?)
+		})
+	}
+
 	pub async fn get_child_group(&self, group_id: &str, c: &L1Cache) -> Result<Arc<RwLock<Group>>, SentcError>
 	{
 		let user = c
