@@ -45,7 +45,8 @@ pub(crate) async fn check_file_upload(
 			.await
 			.map_err(SentcError::FileReadError)?;
 
-		let mut chunk = [0; DEFAULT_CHUNK_SIZE];
+		//use heap and not stack (with normal array) here is important
+		let mut chunk = vec![0; DEFAULT_CHUNK_SIZE];
 
 		let bytes_read = file
 			.read(&mut chunk)
