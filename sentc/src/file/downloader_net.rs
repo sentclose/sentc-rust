@@ -135,7 +135,7 @@ pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<Strin
 	let p = Path::new(name);
 
 	let mut file_name = p
-		.file_name()
+		.file_stem()
 		.and_then(|n| n.to_str())
 		.map(|n| n.to_string())
 		.unwrap_or("".to_string());
@@ -144,10 +144,10 @@ pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<Strin
 
 	let path = path.to_string() + MAIN_SEPARATOR_STR;
 
-	let mut i = 0;
+	let mut i = 1;
 
 	'l1: loop {
-		let c_path = path.clone() + &file_name + ext;
+		let c_path = path.clone() + &file_name + "." + ext;
 
 		let f = match metadata(&c_path).await {
 			Ok(f) => f,
@@ -163,5 +163,5 @@ pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<Strin
 		i += 1;
 	}
 
-	Ok(file_name + ext)
+	Ok(file_name + "." + ext)
 }
