@@ -1144,6 +1144,83 @@ async fn test_58_encrypt_with_new_key()
 	assert_eq!(decrypt_3, STRING_TO_ENCRYPT);
 }
 
+//__________________________________________________________________________________________________________________
+//key rotation with sign
+
+#[tokio::test]
+async fn test_60_start_key_rotation_with_sign()
+{
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	g.key_rotation(true, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_newest_key, new_newest_key);
+
+	//"wait" until the server is done with the rotation before moving on
+	sleep(Duration::from_millis(300)).await;
+}
+
+#[tokio::test]
+async fn test_61_finish_key_rotation_without_verify()
+{
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	g.finish_key_rotation(false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_newest_key, new_newest_key);
+}
+
+#[tokio::test]
+async fn test_62_start_key_rotation_with_sign()
+{
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	g.key_rotation(true, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_newest_key, new_newest_key);
+
+	//"wait" until the server is done with the rotation before moving on
+	sleep(Duration::from_millis(300)).await;
+}
+
+#[tokio::test]
+async fn test_63_finish_key_rotation_with_verify()
+{
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let mut g = g.write().await;
+
+	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	g.finish_key_rotation(true, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_newest_key, new_newest_key);
+}
+
 #[tokio::test]
 async fn zzz_clean_up()
 {
