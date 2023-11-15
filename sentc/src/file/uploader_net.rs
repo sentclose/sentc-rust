@@ -121,12 +121,12 @@ pub(crate) async fn upload_file(
 {
 	let file_meta = file.metadata().await.map_err(SentcError::FileReadError)?;
 
-	let belongs_to_type = if group_id.is_some() {
-		BelongsToType::Group
+	let (belongs_to_type, belongs_to_id) = if group_id.is_some() {
+		(BelongsToType::Group, group_id)
 	} else if other_user_id.is_some() {
-		BelongsToType::User
+		(BelongsToType::User, other_user_id)
 	} else {
-		BelongsToType::None
+		(BelongsToType::None, None)
 	};
 
 	let (file_id, session_id, encrypted_file_name) = register_file(
@@ -138,7 +138,7 @@ pub(crate) async fn upload_file(
 		encrypted_content_key
 			.to_string()
 			.map_err(SentcError::JsonParseFailed)?,
-		other_user_id.map(|o| o.to_string()),
+		belongs_to_id.map(|o| o.to_string()),
 		belongs_to_type,
 		file_name,
 		group_id,
