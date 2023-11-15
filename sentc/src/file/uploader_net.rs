@@ -27,7 +27,8 @@ pub(crate) async fn check_file_upload(
 	upload_callback: Option<impl Fn(u32)>,
 ) -> Result<(), SentcError>
 {
-	let mut index = 0;
+	let mut start = 0;
+	let mut end = DEFAULT_CHUNK_SIZE as u64;
 	let file_size = file_meta.len();
 	let total_chunks = file_size / DEFAULT_CHUNK_SIZE as u64;
 
@@ -36,20 +37,22 @@ pub(crate) async fn check_file_upload(
 	//default key -> will be set after the first chunk was processed.
 	let mut next_file_key: SymKey = SymKey::Aes(Default::default());
 
-	loop {
+	while start < file_size {
 		current_chunk += 1;
 
-		let start = index * DEFAULT_CHUNK_SIZE as u64;
+		// Adjust the end position if it exceeds the file size
+		if end > file_size {
+			end = file_size;
+		}
 
 		file.seek(SeekFrom::Start(start))
 			.await
 			.map_err(SentcError::FileReadError)?;
 
-		//use heap and not stack (with normal array) here is important
-		let mut chunk = vec![0; DEFAULT_CHUNK_SIZE];
+		let mut chunk = vec![0; (end - start) as usize];
 
 		let bytes_read = file
-			.read(&mut chunk)
+			.read_exact(&mut chunk)
 			.await
 			.map_err(SentcError::FileReadError)?;
 
@@ -57,6 +60,8 @@ pub(crate) async fn check_file_upload(
 			break;
 		}
 
+		start = end;
+		end = start + DEFAULT_CHUNK_SIZE as u64;
 		let is_end = start >= file_size;
 
 		if current_chunk == 1 {
@@ -91,12 +96,6 @@ pub(crate) async fn check_file_upload(
 
 		if let Some(cb) = &upload_callback {
 			cb((current_chunk / total_chunks) as u32);
-		}
-
-		index += 1;
-
-		if is_end {
-			break;
 		}
 	}
 
