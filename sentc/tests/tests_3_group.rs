@@ -46,6 +46,9 @@ static GROUP_0_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static GROUP_1_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static GROUP_2_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
+static CHILD_GROUP: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
+static CHILD_GROUP_USER_3: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
+
 static SENTC: OnceCell<Sentc> = OnceCell::const_new();
 
 static ENCRYPTED_STRING: OnceCell<RwLock<EncryptedString>> = OnceCell::const_new();
@@ -855,10 +858,178 @@ async fn test_41_not_get_the_group_after_kick()
 	}
 }
 
-/*
-TODO
-	- child group
- */
+//child group
+
+#[tokio::test]
+async fn test_50_create_a_child_group()
+{
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let id = g
+		.create_child_group(SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let list = g
+		.get_children(None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(list.len(), 1);
+	assert_eq!(list[0].group_id, id);
+
+	let page_two = g
+		.get_children(Some(list.get(0).unwrap()), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(page_two.len(), 0);
+
+	let child_group = g
+		.get_child_group(&id, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	CHILD_GROUP
+		.get_or_init(|| async move { RwLock::new(GroupState(child_group)) })
+		.await;
+}
+
+#[tokio::test]
+async fn test_51_get_child_group_as_member_of_the_parent_group()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let child_group = g
+		.get_child_group(cg.get_group_id(), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let child_group = child_group.read().await;
+
+	assert_eq!(
+		child_group.get_newest_key().unwrap().group_key.key_id,
+		cg.get_newest_key().unwrap().group_key.key_id
+	);
+}
+
+#[tokio::test]
+async fn test_52_invite_a_user_to_the_child_group()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let u = USER_2_TEST_STATE.get().unwrap().read().await;
+	let mut u_r = u.write().await;
+
+	cg.invite_auto(u_r.get_user_id(), Some(2), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let child_group = u_r
+		.get_group(cg.get_group_id(), None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let child_group = child_group.read().await;
+
+	assert_eq!(child_group.get_rank(), 2);
+}
+
+#[tokio::test]
+async fn test_53_re_invite_user()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let u = USER_2_TEST_STATE.get().unwrap().read().await;
+	let u_r = u.read().await;
+
+	cg.re_invite_user(u_r.get_user_id(), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+}
+
+#[tokio::test]
+async fn test_54_get_child_group_by_direct_access()
+{
+	//access the child group by user not by parent group -> the parent should be loaded too
+
+	//auto invite the user to the parent but do not fetch the parent keys!
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let u = USER_3_TEST_STATE.get().unwrap().read().await;
+	let mut u_r = u.write().await;
+
+	g.invite_auto(u_r.get_user_id(), None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	//this should work because the parent is fetched before the child is fetched
+	let child_group = u_r
+		.get_group(cg.get_group_id(), None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let child_group1 = child_group.read().await;
+
+	assert_eq!(
+		child_group1.get_newest_key().unwrap().group_key.key_id,
+		cg.get_newest_key().unwrap().group_key.key_id
+	);
+
+	drop(child_group1);
+
+	CHILD_GROUP_USER_3
+		.get_or_init(|| async move { RwLock::new(GroupState(child_group)) })
+		.await;
+}
+
+#[tokio::test]
+async fn test_55_encrypt_in_child_group()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let g1 = CHILD_GROUP_USER_3.get().unwrap().read().await;
+	let mut g1 = g1.write().await;
+
+	let child_1 = g
+		.get_child_group(cg.get_group_id(), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+	let mut child_1 = child_1.write().await;
+
+	let encrypted = cg
+		.encrypt_string(STRING_TO_ENCRYPT, false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let decrypted_1 = child_1
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let decrypt_2 = g1
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(decrypted_1, STRING_TO_ENCRYPT);
+	assert_eq!(decrypt_2, STRING_TO_ENCRYPT);
+}
 
 #[tokio::test]
 async fn zzz_clean_up()
