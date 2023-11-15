@@ -173,6 +173,11 @@ impl Group
 		&self.group_id
 	}
 
+	pub fn get_rank(&self) -> i32
+	{
+		self.rank
+	}
+
 	pub fn get_newest_hmac_key(&self) -> &HmacKeyFormatInt
 	{
 		&self.hmac_keys[0]
