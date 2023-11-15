@@ -47,6 +47,7 @@ static GROUP_1_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static GROUP_2_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
 static CHILD_GROUP: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
+static CHILD_GROUP_USER_2: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static CHILD_GROUP_USER_3: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
 static SENTC: OnceCell<Sentc> = OnceCell::const_new();
@@ -550,6 +551,7 @@ async fn test_28_decrypt_with_sign_for_other_user()
 	assert_eq!(decrypted, STRING_TO_ENCRYPT);
 }
 
+//__________________________________________________________________________________________________
 //join request
 
 #[tokio::test]
@@ -858,6 +860,7 @@ async fn test_41_not_get_the_group_after_kick()
 	}
 }
 
+//__________________________________________________________________________________________________
 //child group
 
 #[tokio::test]
@@ -936,9 +939,15 @@ async fn test_52_invite_a_user_to_the_child_group()
 		.await
 		.unwrap();
 
-	let child_group = child_group.read().await;
+	let child_group1 = child_group.read().await;
 
-	assert_eq!(child_group.get_rank(), 2);
+	assert_eq!(child_group1.get_rank(), 2);
+
+	drop(child_group1);
+
+	CHILD_GROUP_USER_2
+		.get_or_init(|| async move { RwLock::new(GroupState(child_group)) })
+		.await;
 }
 
 #[tokio::test]
@@ -1003,8 +1012,11 @@ async fn test_55_encrypt_in_child_group()
 	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
 	let g = g.read().await;
 
-	let g1 = CHILD_GROUP_USER_3.get().unwrap().read().await;
+	let g1 = CHILD_GROUP_USER_2.get().unwrap().read().await;
 	let mut g1 = g1.write().await;
+
+	let g2 = CHILD_GROUP_USER_3.get().unwrap().read().await;
+	let mut g2 = g2.write().await;
 
 	let child_1 = g
 		.get_child_group(cg.get_group_id(), SENTC.get().unwrap().get_cache())
@@ -1027,8 +1039,109 @@ async fn test_55_encrypt_in_child_group()
 		.await
 		.unwrap();
 
+	let decrypt_3 = g2
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
 	assert_eq!(decrypted_1, STRING_TO_ENCRYPT);
 	assert_eq!(decrypt_2, STRING_TO_ENCRYPT);
+	assert_eq!(decrypt_3, STRING_TO_ENCRYPT);
+}
+
+#[tokio::test]
+async fn test_56_key_rotation_in_child_group()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let mut cg = cg.write().await;
+
+	let old_key = cg.get_newest_key().unwrap().group_key.key_id.clone();
+
+	cg.key_rotation(false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_key = cg.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_key, new_key);
+
+	//finish the key rotation as direct user
+
+	sleep(Duration::from_millis(300)).await;
+
+	let cg = CHILD_GROUP_USER_2.get().unwrap().read().await;
+	let mut cg = cg.write().await;
+
+	let old_key1 = cg.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_eq!(old_key1, old_key);
+
+	cg.finish_key_rotation(false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let new_key1 = cg.get_newest_key().unwrap().group_key.key_id.clone();
+
+	assert_ne!(old_key1, new_key1);
+
+	assert_eq!(new_key1, new_key);
+}
+
+#[tokio::test]
+async fn test_57_no_error_for_finishing_an_already_finished_rotation()
+{
+	let cg = CHILD_GROUP_USER_3.get().unwrap().read().await;
+	let mut cg = cg.write().await;
+
+	cg.finish_key_rotation(false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+}
+
+#[tokio::test]
+async fn test_58_encrypt_with_new_key()
+{
+	let cg = CHILD_GROUP.get().unwrap().read().await;
+	let cg = cg.read().await;
+
+	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
+	let g = g.read().await;
+
+	let g1 = CHILD_GROUP_USER_2.get().unwrap().read().await;
+	let mut g1 = g1.write().await;
+
+	let g2 = CHILD_GROUP_USER_3.get().unwrap().read().await;
+	let mut g2 = g2.write().await;
+
+	let child_1 = g
+		.get_child_group(cg.get_group_id(), SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+	let mut child_1 = child_1.write().await;
+
+	let encrypted = cg
+		.encrypt_string(STRING_TO_ENCRYPT, false, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let decrypted_1 = child_1
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let decrypt_2 = g1
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	let decrypt_3 = g2
+		.decrypt_string(&encrypted, false, None, SENTC.get().unwrap().get_cache())
+		.await
+		.unwrap();
+
+	assert_eq!(decrypted_1, STRING_TO_ENCRYPT);
+	assert_eq!(decrypt_2, STRING_TO_ENCRYPT);
+	assert_eq!(decrypt_3, STRING_TO_ENCRYPT);
 }
 
 #[tokio::test]
