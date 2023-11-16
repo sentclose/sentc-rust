@@ -123,7 +123,6 @@ impl Group
 		}
 	}
 
-	#[cfg(not(feature = "network"))]
 	pub fn from_server(
 		base_url: String,
 		app_token: String,
