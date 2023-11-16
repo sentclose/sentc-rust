@@ -132,9 +132,19 @@ pub(crate) async fn download_file_meta_information(
 
 pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<String, SentcError>
 {
+	let path = path.to_string() + MAIN_SEPARATOR_STR;
+
+	let f = metadata(path.clone() + name)
+		.await
+		.map_err(SentcError::FileReadError)?;
+
+	if !f.is_file() {
+		return Ok(name.to_string());
+	}
+
 	let p = Path::new(name);
 
-	let mut file_name = p
+	let base_name = p
 		.file_stem()
 		.and_then(|n| n.to_str())
 		.map(|n| n.to_string())
@@ -142,12 +152,10 @@ pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<Strin
 
 	let ext = p.extension().and_then(|n| n.to_str()).unwrap_or("");
 
-	let path = path.to_string() + MAIN_SEPARATOR_STR;
-
 	let mut i = 1;
 
 	'l1: loop {
-		let c_path = path.clone() + &file_name + "." + ext;
+		let c_path = path.clone() + &base_name + i.to_string().as_str() + "." + ext;
 
 		let f = match metadata(&c_path).await {
 			Ok(f) => f,
@@ -159,9 +167,8 @@ pub(crate) async fn check_if_file_exists(path: &str, name: &str) -> Result<Strin
 			break 'l1;
 		}
 
-		file_name = file_name.to_string() + i.to_string().as_str();
 		i += 1;
 	}
 
-	Ok(file_name + "." + ext)
+	Ok(base_name + i.to_string().as_str() + "." + ext)
 }
