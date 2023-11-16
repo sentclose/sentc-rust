@@ -269,6 +269,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
 name = "ed25519"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,6 +740,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pqc_dilithium_edit"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d092e2cee95564d81775b45baa8177590be69a8e93b49af07cef82c853f975c1"
+dependencies = [
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "pqc_kyber"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b23e1823e8a78ad67990c5cb843d5eba75ab3b8a44d041f3814fde89463dc6f"
+dependencies = [
+ "aes 0.8.3",
+ "ctr 0.9.2",
+ "rand_core 0.6.4",
+ "sha2 0.10.7",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -877,6 +904,7 @@ dependencies = [
 name = "sentc"
 version = "0.1.0"
 dependencies = [
+ "dotenv",
  "sentc-crypto",
  "sentc-crypto-full",
  "serde",
@@ -887,7 +915,7 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64ct",
  "pem-rfc7468",
@@ -909,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -918,6 +946,8 @@ dependencies = [
  "hkdf",
  "hmac",
  "ope",
+ "pqc_dilithium_edit",
+ "pqc_kyber",
  "rand_core 0.6.4",
  "sha2 0.10.7",
  "x25519-dalek",
@@ -925,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-full"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "sentc-crypto",
  "sentc-crypto-common",
@@ -936,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-utils"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64ct",
  "pem-rfc7468",
