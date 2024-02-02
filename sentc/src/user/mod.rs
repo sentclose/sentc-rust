@@ -1,5 +1,3 @@
-#[cfg(feature = "network")]
-pub mod crypto_net;
 pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
@@ -64,7 +62,7 @@ impl User
 	{
 		let newest_key_id = data
 			.user_keys
-			.get(0)
+			.first()
 			.ok_or(SentcError::KeyNotFound)?
 			.group_key
 			.key_id

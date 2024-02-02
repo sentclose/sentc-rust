@@ -29,10 +29,7 @@ impl Sentc
 {
 	pub async fn init(base_url: &str, app_token: &str, file_part_url: Option<&str>, cache: Option<L1Cache>) -> Sentc
 	{
-		let mut cache = match cache {
-			None => L1Cache::new(),
-			Some(c) => c,
-		};
+		let mut cache = cache.unwrap_or_default();
 
 		cache.file_part_url = file_part_url.map(|u| u.to_string());
 
