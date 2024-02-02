@@ -1,0 +1,32 @@
+[package]
+name = "sentc-light"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+include = [
+    "Cargo.toml",
+    "LICENSE",
+    "src/**/*",
+]
+
+[dependencies]
+sentc-crypto-light = {workspace=true, features = ["rust"]}
+
+# json handling
+serde_json.workspace = true
+serde.workspace = true
+
+tokio = {workspace=true, optional=true}
+
+# network dependencies
+sentc-crypto-light-full = {workspace = true, optional=true}
+
+[features]
+network = ["sentc-crypto-light-full", "tokio"]
