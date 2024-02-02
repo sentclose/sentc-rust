@@ -1,5 +1,5 @@
 [package]
-name = "sentc"
+name = "sentc-light"
 version.workspace = true
 edition.workspace = true
 license-file.workspace = true
@@ -17,22 +17,16 @@ include = [
 ]
 
 [dependencies]
-sentc-crypto = {workspace=true, features = ["rust"]}
+sentc-crypto-light = {workspace=true, features = ["rust"]}
 
 # json handling
 serde_json.workspace = true
 serde.workspace = true
 
-# network dependencies
-sentc-crypto-full = {workspace = true, optional=true}
-
 tokio = {workspace=true, optional=true}
 
-[dev-dependencies]
-tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false}
-totp-rs = "5.0"
-dotenv = "0.15.0"
+# network dependencies
+sentc-crypto-light-full = {workspace = true, optional=true}
 
 [features]
-network = ["sentc-crypto-full", "tokio"]
-file = ["tokio/fs"]
+network = ["sentc-crypto-light-full", "tokio"]

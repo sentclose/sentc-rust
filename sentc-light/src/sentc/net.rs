@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
-use sentc_crypto::user::verify_user_public_key;
-use sentc_crypto_full::user::{
+use sentc_crypto_light_full::user::{
 	check_user_identifier_available,
 	login,
 	mfa_login,
@@ -15,7 +13,6 @@ use tokio::sync::RwLock;
 
 use crate::cache::l_one::L1Cache;
 use crate::error::SentcError;
-use crate::net_helper::{get_group_public_key, get_user_public_key_data, get_user_verify_key_data};
 use crate::sentc::Sentc;
 use crate::user::User;
 
@@ -27,16 +24,12 @@ pub enum UserLoginReturn
 
 impl Sentc
 {
-	pub async fn init(base_url: &str, app_token: &str, file_part_url: Option<&str>, cache: Option<L1Cache>) -> Sentc
+	pub async fn init(base_url: &str, app_token: &str, cache: Option<L1Cache>) -> Sentc
 	{
-		let mut cache = cache.unwrap_or_default();
-
-		cache.file_part_url = file_part_url.map(|u| u.to_string());
-
 		Self {
 			base_url: base_url.to_string(),
 			app_token: app_token.to_string(),
-			cache,
+			cache: cache.unwrap_or_default(),
 		}
 	}
 
@@ -216,40 +209,5 @@ impl Sentc
 		let u = self.cache.get_user(&id.0).await;
 
 		u.ok_or(SentcError::UserNotFound)
-	}
-
-	pub async fn get_user_public_key_data(&self, user_id: &str) -> Result<Arc<UserPublicKeyData>, SentcError>
-	{
-		get_user_public_key_data(&self.base_url, &self.app_token, user_id, self.get_cache()).await
-	}
-
-	pub async fn get_group_public_key(&self, group_id: &str) -> Result<Arc<UserPublicKeyData>, SentcError>
-	{
-		get_group_public_key(&self.base_url, &self.app_token, group_id, self.get_cache()).await
-	}
-
-	pub async fn get_user_verify_key_data(&self, user_id: &str, verify_key_id: &str) -> Result<Arc<UserVerifyKeyData>, SentcError>
-	{
-		get_user_verify_key_data(
-			&self.base_url,
-			&self.app_token,
-			user_id,
-			verify_key_id,
-			self.get_cache(),
-		)
-		.await
-	}
-
-	pub async fn verify_user_public_key(&self, user_id: &str, public_key: &UserPublicKeyData) -> Result<bool, SentcError>
-	{
-		if let (Some(_sig), Some(key_id)) = (&public_key.public_key_sig, &public_key.public_key_sig_key_id) {
-			let verify_key = self.get_user_verify_key_data(user_id, key_id).await?;
-
-			let verify = verify_user_public_key(&verify_key, public_key)?;
-
-			Ok(verify)
-		} else {
-			Ok(false)
-		}
 	}
 }

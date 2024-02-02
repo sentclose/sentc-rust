@@ -13,8 +13,6 @@ use std::collections::HashMap;
 
 use sentc_crypto::sdk_common::SymKeyId;
 pub use sentc_crypto::{entities as crypto_entities, sdk_common as crypto_common};
-#[cfg(feature = "ear")]
-pub use sentc_ear_core::data as ear_data;
 
 pub type KeyMap = HashMap<SymKeyId, usize>;
 
