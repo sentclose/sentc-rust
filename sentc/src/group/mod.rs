@@ -172,6 +172,16 @@ impl Group
 		&self.group_id
 	}
 
+	pub fn get_parent_group_id(&self) -> Option<&GroupId>
+	{
+		self.parent_group_id.as_ref()
+	}
+
+	pub fn get_fetched_from_parent_group(&self) -> bool
+	{
+		self.from_parent
+	}
+
 	pub fn get_rank(&self) -> i32
 	{
 		self.rank
