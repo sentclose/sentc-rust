@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "sentc"
+    "sentc",
+    "sentc-light"
 ]
 
 [workspace.package]
@@ -23,6 +24,19 @@ sentc-crypto-common = { path = "../../backend/sentc-api/sdk-common" }    # for l
 #sentc-crypto-full = {version = "0.11.0", git = "https://github.com/sentclose/sentc.git", rev="ad3a44c59bae5867c5a2a95a7f066890673904ca", features = ["rustls",  "rust"]}
 sentc-crypto-full = {path = "../../sdk/crypto_full", features = ["rustls", "rust"]} # for local dev
 
+#sentc-crypto-light = {version = "0.11.0", git = "https://github.com/sentclose/sentc.git", rev="ba6e72ed9ade5529ce14ef103c4db7ac25bcfcc2", default-features = false, features = ["server_test"]}
+sentc-crypto-light = {path = "../../sdk/crypto_light", default-features = false, features = ["server_test"]} # for local dev
+
+#sentc-crypto-light-full = {version = "0.11.0", git = "https://github.com/sentclose/sentc.git", rev="ad3a44c59bae5867c5a2a95a7f066890673904ca", features = ["rustls",  "rust"]}
+sentc-crypto-light-full = {path = "../../sdk/crypto_light_full", features = ["rustls", "rust"]} # for local dev
+
+# json handling
+serde_json = {version = "1.0.81", default-features = false, features = ["alloc"]}
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"]}
+
+tokio = {version = "1.32.0", features = ["sync"], default-features = false}
+
 # workspace packages
 
 sentc = {version = "0.1.0", path = "sentc"}
+sentc-light = {version = "0.1.0", path = "sentc-light"}

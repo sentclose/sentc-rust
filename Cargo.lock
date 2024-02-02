@@ -965,6 +965,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentc-crypto-light"
+version = "0.11.0"
+dependencies = [
+ "base64ct",
+ "pem-rfc7468",
+ "sentc-crypto-common",
+ "sentc-crypto-core",
+ "sentc-crypto-utils",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sentc-crypto-light-full"
+version = "0.11.0"
+dependencies = [
+ "sentc-crypto-common",
+ "sentc-crypto-light",
+ "sentc-crypto-utils",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "sentc-crypto-utils"
 version = "0.11.0"
 dependencies = [
@@ -975,6 +999,17 @@ dependencies = [
  "sentc-crypto-core",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "sentc-light"
+version = "0.1.0"
+dependencies = [
+ "sentc-crypto-light",
+ "sentc-crypto-light-full",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
