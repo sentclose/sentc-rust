@@ -200,4 +200,14 @@ impl Sentc
 	}
 
 	//______________________________________________________________________________________________
+
+	pub async fn get_actual_user(&self) -> Result<Arc<RwLock<User>>, SentcError>
+	{
+		let id = self.cache.get_actual_user();
+		let id = id.read().await;
+
+		let u = self.cache.get_user(&id.0).await;
+
+		u.ok_or(SentcError::UserNotFound)
+	}
 }

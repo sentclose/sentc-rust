@@ -121,6 +121,11 @@ impl User
 		&self.verify_device_key
 	}
 
+	pub fn get_sign_device_key(&self) -> &SignKeyFormatInt
+	{
+		&self.sign_device_key
+	}
+
 	pub fn get_exported_verify_device_key(&self) -> &UserVerifyKeyData
 	{
 		&self.exported_verify_device_key
