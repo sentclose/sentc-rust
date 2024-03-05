@@ -1,3 +1,5 @@
+#[cfg(feature = "network")]
+pub mod crypto_net;
 pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
