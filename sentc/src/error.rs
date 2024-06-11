@@ -1,3 +1,4 @@
+use sentc_crypto::sdk_utils::error::SdkUtilError;
 use sentc_crypto::SdkError;
 
 #[derive(Debug)]
@@ -51,5 +52,13 @@ impl From<sentc_crypto::sdk_core::Error> for SentcError
 	fn from(value: sentc_crypto::sdk_core::Error) -> Self
 	{
 		value.into()
+	}
+}
+
+impl From<SdkUtilError> for SentcError
+{
+	fn from(value: SdkUtilError) -> Self
+	{
+		Self::Sdk(SdkError::Util(value))
 	}
 }

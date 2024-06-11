@@ -1,15 +1,10 @@
 use sentc_crypto::crypto::{
-	decrypt_raw_asymmetric,
-	decrypt_string_asymmetric,
 	done_fetch_sym_key_by_private_key,
-	encrypt_asymmetric,
-	encrypt_raw_asymmetric,
-	encrypt_string_asymmetric,
 	generate_non_register_sym_key_by_public_key,
 	split_head_and_encrypted_data,
 	split_head_and_encrypted_string,
 };
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::entities::keys::{PublicKey, SymmetricKey};
 use sentc_crypto::sdk_common::crypto::EncryptedHead;
 use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
 
@@ -24,7 +19,7 @@ impl User
 	{
 		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 
-		Ok(encrypt_raw_asymmetric(reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_raw_with_user_key(reply_key, data, sign_key)?)
 	}
 
 	pub fn decrypt_raw_sync(&self, head: &EncryptedHead, encrypted_data: &[u8], verify_key: Option<&UserVerifyKeyData>)
@@ -34,12 +29,9 @@ impl User
 			.get_user_keys(&head.id)
 			.ok_or(SentcError::KeyNotFound)?;
 
-		Ok(decrypt_raw_asymmetric(
-			&key.private_key,
-			encrypted_data,
-			head,
-			verify_key,
-		)?)
+		Ok(key
+			.private_key
+			.decrypt_raw(encrypted_data, head, verify_key)?)
 	}
 
 	//______________________________________________________________________________________________
@@ -49,7 +41,7 @@ impl User
 	{
 		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 
-		Ok(encrypt_asymmetric(reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_with_user_key(reply_key, data, sign_key)?)
 	}
 
 	pub fn decrypt_sync(&self, data: &[u8], verify_key: Option<&UserVerifyKeyData>) -> Result<Vec<u8>, SentcError>
@@ -66,7 +58,7 @@ impl User
 	{
 		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 
-		Ok(encrypt_string_asymmetric(reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_string_with_user_key(reply_key, data, sign_key)?)
 	}
 
 	pub fn decrypt_string_sync(&self, data: &str, verify_key: Option<&UserVerifyKeyData>) -> Result<String, SentcError>
@@ -77,13 +69,13 @@ impl User
 			.get_user_keys(&head.id)
 			.ok_or(SentcError::KeyNotFound)?;
 
-		Ok(decrypt_string_asymmetric(&key.private_key, data, verify_key)?)
+		Ok(key.private_key.decrypt_string(data, verify_key)?)
 	}
 
 	//==============================================================================================
 	//sym key
 
-	pub fn generate_non_registered_key(&self, reply_key: &UserPublicKeyData) -> Result<(SymKeyFormatInt, String), SentcError>
+	pub fn generate_non_registered_key(&self, reply_key: &UserPublicKeyData) -> Result<(SymmetricKey, String), SentcError>
 	{
 		let (raw_key, key_out) = generate_non_register_sym_key_by_public_key(reply_key)?;
 
@@ -95,7 +87,7 @@ impl User
 		))
 	}
 
-	pub fn get_non_registered_key_sync(&self, master_key_id: &str, server_out: &str) -> Result<SymKeyFormatInt, SentcError>
+	pub fn get_non_registered_key_sync(&self, master_key_id: &str, server_out: &str) -> Result<SymmetricKey, SentcError>
 	{
 		let key = self
 			.get_user_keys(master_key_id)

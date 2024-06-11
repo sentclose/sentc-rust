@@ -1,7 +1,6 @@
 use std::path::{Path, MAIN_SEPARATOR_STR};
 
-use sentc_crypto::crypto::decrypt_string_symmetric;
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::entities::keys::SymmetricKey;
 use sentc_crypto::sdk_common::file::FileData;
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
 use sentc_crypto_full::file::{delete_file, update_file_name};
@@ -24,7 +23,7 @@ pub struct FileCreateOutput
 pub struct FileDownloadOutput
 {
 	pub file_data: FileData,
-	pub key: SymKeyFormatInt,
+	pub key: SymmetricKey,
 	pub file_name: Option<String>,
 }
 
@@ -151,7 +150,7 @@ impl Group
 		file_id: &str,
 		verify_key: Option<&UserVerifyKeyData>,
 		c: &L1Cache,
-	) -> Result<(FileData, SymKeyFormatInt, Option<String>), SentcError>
+	) -> Result<(FileData, SymmetricKey, Option<String>), SentcError>
 	{
 		let user = c
 			.get_user(&self.used_user_id)
@@ -188,7 +187,7 @@ impl Group
 			.await?;
 
 		let file_name = if let Some(file_name) = &meta.encrypted_file_name {
-			Some(decrypt_string_symmetric(&key, file_name, verify_key)?)
+			Some(key.decrypt_string(file_name, verify_key)?)
 		} else {
 			None
 		};
@@ -200,7 +199,7 @@ impl Group
 		&self,
 		file: File,
 		file_meta: FileData,
-		content_key: &SymKeyFormatInt,
+		content_key: &SymmetricKey,
 		verify_key: Option<&UserVerifyKeyData>,
 		c: &L1Cache,
 	) -> Result<(), SentcError>
@@ -222,7 +221,7 @@ impl Group
 		&self,
 		file: File,
 		file_meta: FileData,
-		content_key: &SymKeyFormatInt,
+		content_key: &SymmetricKey,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
 		c: &L1Cache,
@@ -381,13 +380,8 @@ impl Group
 
 	//______________________________________________________________________________________________
 
-	pub async fn update_file_name(
-		&self,
-		file_id: &str,
-		content_key: &SymKeyFormatInt,
-		file_name: Option<String>,
-		c: &L1Cache,
-	) -> Result<(), SentcError>
+	pub async fn update_file_name(&self, file_id: &str, content_key: &SymmetricKey, file_name: Option<String>, c: &L1Cache)
+		-> Result<(), SentcError>
 	{
 		let user = c
 			.get_user(&self.used_user_id)

@@ -1,19 +1,5 @@
-use sentc_crypto::crypto::{
-	decrypt_raw_symmetric,
-	decrypt_raw_symmetric_with_aad,
-	decrypt_string_symmetric,
-	decrypt_string_symmetric_with_aad,
-	done_fetch_sym_key,
-	encrypt_raw_symmetric,
-	encrypt_raw_symmetric_with_aad,
-	encrypt_string_symmetric,
-	encrypt_string_symmetric_with_aad,
-	encrypt_symmetric,
-	encrypt_symmetric_with_aad,
-	split_head_and_encrypted_data,
-	split_head_and_encrypted_string,
-};
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::crypto::{done_fetch_sym_key, split_head_and_encrypted_data, split_head_and_encrypted_string};
+use sentc_crypto::entities::keys::SymmetricKey;
 use sentc_crypto::sdk_common::crypto::EncryptedHead;
 
 use crate::cache::l_one::L1Cache;
@@ -62,7 +48,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_raw_symmetric(&key.group_key, data, sign_key)?)
+			Ok(key.group_key.encrypt_raw(data, sign_key)?)
 		})
 	}
 
@@ -79,12 +65,9 @@ impl Group
 
 		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
-		Ok(decrypt_raw_symmetric(
-			&key.group_key,
-			encrypted_data,
-			head,
-			verify_key.as_deref(),
-		)?)
+		Ok(key
+			.group_key
+			.decrypt_raw(encrypted_data, head, verify_key.as_deref())?)
 	}
 
 	//______________________________________________________________________________________________
@@ -95,7 +78,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_raw_symmetric_with_aad(&key.group_key, data, aad, sign_key)?)
+			Ok(key.group_key.encrypt_raw_with_aad(data, aad, sign_key)?)
 		})
 	}
 
@@ -113,13 +96,9 @@ impl Group
 
 		let verify_key = get_verify_key_internally_for_decrypt(head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
-		Ok(decrypt_raw_symmetric_with_aad(
-			&key.group_key,
-			encrypted_data,
-			head,
-			aad,
-			verify_key.as_deref(),
-		)?)
+		Ok(key
+			.group_key
+			.decrypt_raw_with_aad(encrypted_data, aad, head, verify_key.as_deref())?)
 	}
 
 	//______________________________________________________________________________________________
@@ -129,7 +108,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_symmetric(&key.group_key, data, sign_key)?)
+			Ok(key.group_key.encrypt(data, sign_key)?)
 		})
 	}
 
@@ -147,7 +126,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_symmetric_with_aad(&key.group_key, data, aad, sign_key)?)
+			Ok(key.group_key.encrypt_with_aad(data, aad, sign_key)?)
 		})
 	}
 
@@ -168,7 +147,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_string_symmetric(&key.group_key, data, sign_key)?)
+			Ok(key.group_key.encrypt_string(data, sign_key)?)
 		})
 	}
 
@@ -180,7 +159,7 @@ impl Group
 
 		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
-		Ok(decrypt_string_symmetric(&key.group_key, data, verify_key.as_deref())?)
+		Ok(key.group_key.decrypt_string(data, verify_key.as_deref())?)
 	}
 
 	//______________________________________________________________________________________________
@@ -191,12 +170,7 @@ impl Group
 		opt_sign!(self, c, sign, |sign_key| {
 			let key = self.get_newest_key().ok_or(SentcError::KeyNotFound)?;
 
-			Ok(encrypt_string_symmetric_with_aad(
-				&key.group_key,
-				data,
-				aad,
-				sign_key,
-			)?)
+			Ok(key.group_key.encrypt_string_with_aad(data, aad, sign_key)?)
 		})
 	}
 
@@ -215,18 +189,15 @@ impl Group
 
 		let verify_key = get_verify_key_internally_for_decrypt(&head, &self.base_url, &self.app_token, verify, user_id, c).await?;
 
-		Ok(decrypt_string_symmetric_with_aad(
-			&key.group_key,
-			data,
-			aad,
-			verify_key.as_deref(),
-		)?)
+		Ok(key
+			.group_key
+			.decrypt_string_with_aad(data, aad, verify_key.as_deref())?)
 	}
 
 	//==============================================================================================
 	//sym key
 
-	pub async fn get_non_registered_key(&mut self, master_key_id: &str, server_output: &str, c: &L1Cache) -> Result<SymKeyFormatInt, SentcError>
+	pub async fn get_non_registered_key(&mut self, master_key_id: &str, server_output: &str, c: &L1Cache) -> Result<SymmetricKey, SentcError>
 	{
 		let key = user_to_group_key!(self, c, master_key_id)?;
 

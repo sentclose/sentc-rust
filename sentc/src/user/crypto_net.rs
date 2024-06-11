@@ -1,14 +1,5 @@
-use sentc_crypto::crypto::{
-	decrypt_raw_asymmetric,
-	decrypt_string_asymmetric,
-	done_fetch_sym_key_by_private_key,
-	encrypt_asymmetric,
-	encrypt_raw_asymmetric,
-	encrypt_string_asymmetric,
-	split_head_and_encrypted_data,
-	split_head_and_encrypted_string,
-};
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::crypto::{done_fetch_sym_key_by_private_key, split_head_and_encrypted_data, split_head_and_encrypted_string};
+use sentc_crypto::entities::keys::{PublicKey, SymmetricKey};
 use sentc_crypto::sdk_common::crypto::EncryptedHead;
 
 use crate::cache::l_one::L1Cache;
@@ -39,7 +30,7 @@ impl User
 
 		let reply_key = get_user_public_key_data(&self.base_url, &self.app_token, reply_id, c).await?;
 
-		Ok(encrypt_raw_asymmetric(&reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_raw_with_user_key(&reply_key, data, sign_key)?)
 	}
 
 	pub async fn decrypt_raw(
@@ -55,12 +46,9 @@ impl User
 
 		let key = get_user_key!(self, &head.id, c);
 
-		Ok(decrypt_raw_asymmetric(
-			&key.private_key,
-			encrypted_data,
-			head,
-			verify_key.as_deref(),
-		)?)
+		Ok(key
+			.private_key
+			.decrypt_raw(encrypted_data, head, verify_key.as_deref())?)
 	}
 
 	//______________________________________________________________________________________________
@@ -71,7 +59,7 @@ impl User
 		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 		let reply_key = get_user_public_key_data(&self.base_url, &self.app_token, reply_id, c).await?;
 
-		Ok(encrypt_asymmetric(&reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_with_user_key(&reply_key, data, sign_key)?)
 	}
 
 	pub async fn decrypt(&mut self, data: &[u8], verify: bool, user_id: Option<&str>, c: &L1Cache) -> Result<Vec<u8>, SentcError>
@@ -89,7 +77,7 @@ impl User
 		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 		let reply_key = get_user_public_key_data(&self.base_url, &self.app_token, reply_id, c).await?;
 
-		Ok(encrypt_string_asymmetric(&reply_key, data, sign_key)?)
+		Ok(PublicKey::encrypt_string_with_user_key(&reply_key, data, sign_key)?)
 	}
 
 	pub async fn decrypt_string(&mut self, data: &str, verify: bool, user_id: Option<&str>, c: &L1Cache) -> Result<String, SentcError>
@@ -100,17 +88,15 @@ impl User
 
 		let key = get_user_key!(self, &head.id, c);
 
-		Ok(decrypt_string_asymmetric(
-			&key.private_key,
-			data,
-			verify_key.as_deref(),
-		)?)
+		Ok(key
+			.private_key
+			.decrypt_string(data, verify_key.as_deref())?)
 	}
 
 	//==============================================================================================
 	//sym key
 
-	pub async fn get_non_registered_key(&mut self, master_key_id: &str, server_output: &str, c: &L1Cache) -> Result<SymKeyFormatInt, SentcError>
+	pub async fn get_non_registered_key(&mut self, master_key_id: &str, server_output: &str, c: &L1Cache) -> Result<SymmetricKey, SentcError>
 	{
 		let key = get_user_key!(self, master_key_id, c);
 

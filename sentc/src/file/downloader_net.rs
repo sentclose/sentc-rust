@@ -1,9 +1,8 @@
 use std::path::{Path, MAIN_SEPARATOR_STR};
 
-use sentc_crypto::entities::keys::SymKeyFormatInt;
+use sentc_crypto::entities::keys::SymmetricKey;
 use sentc_crypto::sdk_common::file::{FileData, FilePartListItem};
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
-use sentc_crypto::sdk_core::SymKey;
 use sentc_crypto_full::file::{download_and_decrypt_file_part, download_and_decrypt_file_part_start, download_file_meta, download_part_list};
 use tokio::fs::{metadata, File};
 use tokio::io::AsyncWriteExt;
@@ -17,14 +16,14 @@ pub(crate) async fn download_parts(
 	base_url: &str,
 	app_token: &str,
 	url_prefix: Option<String>,
-	contend_key: &SymKeyFormatInt,
+	contend_key: &SymmetricKey,
 	part_list: &[FilePartListItem],
 	upload_callback: Option<impl Fn(u32)>,
 	verify_key: Option<&UserVerifyKeyData>,
 ) -> Result<(), SentcError>
 {
 	//default key -> will be set after the first chunk was processed.
-	let mut next_file_key: SymKey = SymKey::Aes(Default::default());
+	let mut next_file_key = None;
 
 	for (i, part) in part_list.iter().enumerate() {
 		let external = part.extern_storage;
@@ -42,7 +41,7 @@ pub(crate) async fn download_parts(
 			)
 			.await?;
 
-			next_file_key = next_key;
+			next_file_key = Some(next_key);
 			decrypted_part
 		} else {
 			let (decrypted_part, next_key) = download_and_decrypt_file_part(
@@ -50,12 +49,12 @@ pub(crate) async fn download_parts(
 				part_url_base,
 				app_token,
 				&part.part_id,
-				&next_file_key,
+				&next_file_key.unwrap(),
 				verify_key,
 			)
 			.await?;
 
-			next_file_key = next_key;
+			next_file_key = Some(next_key);
 			decrypted_part
 		};
 
@@ -101,7 +100,7 @@ pub(crate) async fn download_file_meta_information(
 	let mut next_fetch = true;
 
 	while next_fetch {
-		//parts are there in last otherwise it would returned the meta
+		//parts are there in last otherwise it would return the meta
 		let last_item = part_list.last().ok_or(SentcError::FilePartNotFound)?;
 
 		let mut fetched_parts = download_part_list(

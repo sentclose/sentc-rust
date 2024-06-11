@@ -142,10 +142,10 @@ macro_rules! user_jwt {
 }
 
 /**
-Gets a group key and fetch it if it doesn't exists.
+Gets a group key and fetch it if it doesn't exist.
 
 This macro does the same as get_and_fetch_key but without the boxed fut if the key exists.
-It still needs an some kind owned version of a group (like WriteLock from RwLock)
+It still needs a some kind owned version of a group (like WriteLock from RwLock)
  */
 #[macro_export]
 macro_rules! group_key {
@@ -753,7 +753,7 @@ impl Group
 		})
 	}
 
-	pub async fn delete_join_req(&self, id: &str, c: &L1Cache) -> Result<(), SentcError>
+	pub async fn delete_join_req(&self, id: &str, jwt: &str) -> Result<(), SentcError>
 	{
 		user_jwt!(self, c, |jwt| {
 			Ok(delete_sent_join_req(

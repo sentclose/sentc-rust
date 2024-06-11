@@ -157,7 +157,7 @@ async fn test_12_encrypt_string()
 	let mut encrypted_values = Vec::with_capacity(10);
 
 	for v in STR_VALUES {
-		encrypted_values.push(g.encrypt_sortable_raw_string(v).unwrap());
+		encrypted_values.push(g.encrypt_sortable_raw_string(v, None).unwrap());
 	}
 
 	//check the numbers
@@ -173,7 +173,7 @@ async fn test_12_encrypt_string()
 	let mut new_encrypted_values = Vec::with_capacity(10);
 
 	for v in STR_VALUES {
-		new_encrypted_values.push(g1.encrypt_sortable_raw_string(v).unwrap());
+		new_encrypted_values.push(g1.encrypt_sortable_raw_string(v, None).unwrap());
 	}
 
 	//check the numbers

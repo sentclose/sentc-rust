@@ -1,9 +1,8 @@
 use std::fs::Metadata;
 
-use sentc_crypto::entities::keys::{SignKeyFormatInt, SymKeyFormatInt};
+use sentc_crypto::entities::keys::{SignKey, SymmetricKey};
 use sentc_crypto::sdk_common::crypto::GeneratedSymKeyHeadServerOutput;
 use sentc_crypto::sdk_common::file::BelongsToType;
-use sentc_crypto::sdk_core::SymKey;
 use sentc_crypto_full::file::{register_file, upload_part, upload_part_start};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
@@ -21,9 +20,9 @@ pub(crate) async fn check_file_upload(
 	url_prefix: Option<String>,
 	app_token: &str,
 	jwt: &str,
-	content_key: &SymKeyFormatInt,
+	content_key: &SymmetricKey,
 	session_id: &str,
-	sign_key: Option<&SignKeyFormatInt>,
+	sign_key: Option<&SignKey>,
 	upload_callback: Option<impl Fn(u32)>,
 ) -> Result<(), SentcError>
 {
@@ -35,7 +34,7 @@ pub(crate) async fn check_file_upload(
 	let mut current_chunk = 0;
 
 	//default key -> will be set after the first chunk was processed.
-	let mut next_file_key: SymKey = SymKey::Aes(Default::default());
+	let mut next_file_key = None;
 
 	while start < file_size {
 		current_chunk += 1;
@@ -65,33 +64,37 @@ pub(crate) async fn check_file_upload(
 		let is_end = start >= file_size;
 
 		if current_chunk == 1 {
-			next_file_key = upload_part_start(
-				base_url.to_string(),
-				url_prefix.clone(),
-				app_token,
-				jwt,
-				session_id,
-				is_end,
-				current_chunk as i32,
-				content_key,
-				sign_key,
-				&chunk,
-			)
-			.await?;
+			next_file_key = Some(
+				upload_part_start(
+					base_url.to_string(),
+					url_prefix.clone(),
+					app_token,
+					jwt,
+					session_id,
+					is_end,
+					current_chunk as i32,
+					content_key,
+					sign_key,
+					&chunk,
+				)
+				.await?,
+			);
 		} else {
-			next_file_key = upload_part(
-				base_url.to_string(),
-				url_prefix.clone(),
-				app_token,
-				jwt,
-				session_id,
-				is_end,
-				current_chunk as i32,
-				&next_file_key,
-				sign_key,
-				&chunk,
-			)
-			.await?;
+			next_file_key = Some(
+				upload_part(
+					base_url.to_string(),
+					url_prefix.clone(),
+					app_token,
+					jwt,
+					session_id,
+					is_end,
+					current_chunk as i32,
+					&next_file_key.unwrap(),
+					sign_key,
+					&chunk,
+				)
+				.await?,
+			);
 		}
 
 		if let Some(cb) = &upload_callback {
@@ -110,9 +113,9 @@ pub(crate) async fn upload_file(
 	url_prefix: Option<String>,
 	app_token: &str,
 	jwt: &str,
-	content_key: &SymKeyFormatInt,
+	content_key: &SymmetricKey,
 	encrypted_content_key: &GeneratedSymKeyHeadServerOutput,
-	sign_key: Option<&SignKeyFormatInt>,
+	sign_key: Option<&SignKey>,
 	upload_callback: Option<impl Fn(u32)>,
 	group_id: Option<&str>,
 	other_user_id: Option<&str>,

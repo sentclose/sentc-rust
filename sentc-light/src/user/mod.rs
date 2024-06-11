@@ -3,7 +3,7 @@ pub mod net;
 
 use sentc_crypto_light::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
 use sentc_crypto_light::sdk_common::{DeviceId, UserId};
-use sentc_crypto_light::sdk_utils::keys::{PrivateKeyFormatInt, PublicKeyFormatInt, SignKeyFormatInt, VerifyKeyFormatInt};
+use sentc_crypto_light::sdk_utils::keys::{PublicKey, SecretKey, SignKey, VerifyKey};
 use sentc_crypto_light::user::prepare_register_device;
 use sentc_crypto_light::UserDataInt;
 
@@ -21,10 +21,10 @@ pub struct User
 	mfa: bool,
 
 	//device keys
-	private_device_key: PrivateKeyFormatInt,
-	public_device_key: PublicKeyFormatInt,
-	sign_device_key: SignKeyFormatInt,
-	verify_device_key: VerifyKeyFormatInt,
+	private_device_key: SecretKey,
+	public_device_key: PublicKey,
+	sign_device_key: SignKey,
+	verify_device_key: VerifyKey,
 	exported_verify_device_key: UserVerifyKeyData,
 	exported_public_device_key: UserPublicKeyData,
 
@@ -106,22 +106,22 @@ impl User
 		self.mfa
 	}
 
-	pub fn get_private_device_key(&self) -> &PrivateKeyFormatInt
+	pub fn get_private_device_key(&self) -> &SecretKey
 	{
 		&self.private_device_key
 	}
 
-	pub fn get_public_device_key(&self) -> &PublicKeyFormatInt
+	pub fn get_public_device_key(&self) -> &PublicKey
 	{
 		&self.public_device_key
 	}
 
-	pub fn get_verify_device_key(&self) -> &VerifyKeyFormatInt
+	pub fn get_verify_device_key(&self) -> &VerifyKey
 	{
 		&self.verify_device_key
 	}
 
-	pub fn get_sign_device_key(&self) -> &SignKeyFormatInt
+	pub fn get_sign_device_key(&self) -> &SignKey
 	{
 		&self.sign_device_key
 	}

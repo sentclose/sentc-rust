@@ -4,14 +4,7 @@ pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
 
-use sentc_crypto::entities::keys::{
-	HmacKeyFormatInt,
-	PrivateKeyFormatInt,
-	PublicKeyFormatInt,
-	SignKeyFormatInt,
-	SymKeyFormatInt,
-	VerifyKeyFormatInt,
-};
+use sentc_crypto::entities::keys::{HmacKey, PublicKey, SecretKey, SignKey, SymmetricKey, VerifyKey};
 use sentc_crypto::entities::user::{UserDataInt, UserKeyDataInt};
 use sentc_crypto::group::prepare_create;
 use sentc_crypto::sdk_common::group::GroupHmacData;
@@ -35,10 +28,10 @@ pub struct User
 	mfa: bool,
 
 	//device keys
-	private_device_key: PrivateKeyFormatInt,
-	public_device_key: PublicKeyFormatInt,
-	sign_device_key: SignKeyFormatInt,
-	verify_device_key: VerifyKeyFormatInt,
+	private_device_key: SecretKey,
+	public_device_key: PublicKey,
+	sign_device_key: SignKey,
+	verify_device_key: VerifyKey,
 	exported_verify_device_key: UserVerifyKeyData,
 	exported_public_device_key: UserPublicKeyData,
 
@@ -46,7 +39,7 @@ pub struct User
 	user_keys: Vec<UserKeyDataInt>,
 	key_map: KeyMap,
 	newest_key_id: SymKeyId,
-	hmac_keys: Vec<HmacKeyFormatInt>,
+	hmac_keys: Vec<HmacKey>,
 
 	base_url: String,
 	app_token: String,
@@ -144,12 +137,12 @@ impl User
 		self.user_keys.get(*index)
 	}
 
-	pub fn get_newest_public_key(&self) -> Option<&PublicKeyFormatInt>
+	pub fn get_newest_public_key(&self) -> Option<&PublicKey>
 	{
 		self.get_newest_key().map(|k| &k.public_key)
 	}
 
-	pub fn get_newest_sign_key(&self) -> Option<&SignKeyFormatInt>
+	pub fn get_newest_sign_key(&self) -> Option<&SignKey>
 	{
 		self.get_newest_key().map(|k| &k.sign_key)
 	}
@@ -185,22 +178,22 @@ impl User
 		self.mfa
 	}
 
-	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymKeyFormatInt>, bool)
+	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymmetricKey>, bool)
 	{
 		prepare_group_keys_ref!(self.user_keys, page, 50)
 	}
 
-	pub fn get_private_device_key(&self) -> &PrivateKeyFormatInt
+	pub fn get_private_device_key(&self) -> &SecretKey
 	{
 		&self.private_device_key
 	}
 
-	pub fn get_public_device_key(&self) -> &PublicKeyFormatInt
+	pub fn get_public_device_key(&self) -> &PublicKey
 	{
 		&self.public_device_key
 	}
 
-	pub fn get_verify_device_key(&self) -> &VerifyKeyFormatInt
+	pub fn get_verify_device_key(&self) -> &VerifyKey
 	{
 		&self.verify_device_key
 	}

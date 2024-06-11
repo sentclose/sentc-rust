@@ -6,16 +6,15 @@ pub mod file;
 #[cfg(feature = "network")]
 pub mod net;
 
-use sentc_crypto::crypto_searchable::{create_searchable, create_searchable_raw, search};
-use sentc_crypto::crypto_sortable::{encrypt_number, encrypt_raw_number, encrypt_raw_string, encrypt_string};
 use sentc_crypto::entities::group::GroupKeyData;
-use sentc_crypto::entities::keys::{HmacKeyFormatInt, PrivateKeyFormatInt, SortableKeyFormatInt, SymKeyFormatInt};
+use sentc_crypto::entities::keys::{HmacKey, SecretKey, SortableKey, SymmetricKey};
 use sentc_crypto::group::{decrypt_group_keys, prepare_change_rank, prepare_group_keys_for_new_member};
 use sentc_crypto::sdk_common::content_searchable::SearchableCreateOutput;
 use sentc_crypto::sdk_common::content_sortable::SortableEncryptOutput;
 use sentc_crypto::sdk_common::group::{GroupHmacData, GroupKeyServerOutput, GroupSortableData};
 use sentc_crypto::sdk_common::user::UserPublicKeyData;
 use sentc_crypto::sdk_common::{GroupId, SymKeyId, UserId};
+use sentc_crypto::sdk_core::cryptomat::SortableKey as CoreSort;
 
 use crate::error::SentcError;
 use crate::{decrypt_hmac_key, decrypt_sort_key, KeyMap};
@@ -36,7 +35,7 @@ macro_rules! prepare_group_keys_ref {
 			$keys[offset..end]
 				.iter()
 				.map(|k| &k.group_key)
-				.collect::<Vec<&SymKeyFormatInt>>(),
+				.collect::<Vec<&sentc_crypto::entities::keys::SymmetricKey>>(),
 			end < $keys.len() - 1,
 		)
 	}};
@@ -65,8 +64,8 @@ pub struct Group
 	access_by_group_as_member: Option<GroupId>,
 
 	keys: Vec<GroupKeyData>,
-	hmac_keys: Vec<HmacKeyFormatInt>,
-	sortable_keys: Vec<SortableKeyFormatInt>,
+	hmac_keys: Vec<HmacKey>,
+	sortable_keys: Vec<SortableKey>,
 	newest_key_id: SymKeyId,
 	key_map: KeyMap,
 
@@ -187,12 +186,12 @@ impl Group
 		self.rank
 	}
 
-	pub fn get_newest_hmac_key(&self) -> &HmacKeyFormatInt
+	pub fn get_newest_hmac_key(&self) -> &HmacKey
 	{
 		&self.hmac_keys[0]
 	}
 
-	pub fn get_newest_sortable_key(&self) -> &SortableKeyFormatInt
+	pub fn get_newest_sortable_key(&self) -> &SortableKey
 	{
 		&self.sortable_keys[0]
 	}
@@ -272,21 +271,21 @@ impl Group
 	{
 		let key = self.get_newest_hmac_key();
 
-		Ok(create_searchable_raw(key, data, full, limit)?)
+		Ok(key.create_searchable_raw(data, full, limit)?)
 	}
 
 	pub fn create_search(&self, data: &str, full: bool, limit: Option<usize>) -> Result<SearchableCreateOutput, SentcError>
 	{
 		let key = self.get_newest_hmac_key();
 
-		Ok(create_searchable(key, data, full, limit)?)
+		Ok(key.create_searchable(data, full, limit)?)
 	}
 
 	pub fn search(&self, data: &str) -> Result<String, SentcError>
 	{
 		let key = self.get_newest_hmac_key();
 
-		Ok(search(key, data)?)
+		Ok(key.search(data)?)
 	}
 
 	//______________________________________________________________________________________________
@@ -296,34 +295,34 @@ impl Group
 	{
 		let key = self.get_newest_sortable_key();
 
-		Ok(encrypt_raw_number(key, number)?)
+		Ok(key.encrypt_sortable(number)?)
 	}
 
 	pub fn encrypt_sortable_number(&self, number: u64) -> Result<SortableEncryptOutput, SentcError>
 	{
 		let key = self.get_newest_sortable_key();
 
-		Ok(encrypt_number(key, number)?)
+		Ok(key.encrypt_number(number)?)
 	}
 
-	pub fn encrypt_sortable_raw_string(&self, data: &str) -> Result<u64, SentcError>
+	pub fn encrypt_sortable_raw_string(&self, data: &str, max_len: Option<usize>) -> Result<u64, SentcError>
 	{
 		let key = self.get_newest_sortable_key();
 
-		Ok(encrypt_raw_string(key, data)?)
+		Ok(key.encrypt_raw_string(data, max_len)?)
 	}
 
-	pub fn encrypt_sortable_string(&self, data: &str) -> Result<SortableEncryptOutput, SentcError>
+	pub fn encrypt_sortable_string(&self, data: &str, max_len: Option<usize>) -> Result<SortableEncryptOutput, SentcError>
 	{
 		let key = self.get_newest_sortable_key();
 
-		Ok(encrypt_string(key, data)?)
+		Ok(key.encrypt_string(data, max_len)?)
 	}
 
 	//==============================================================================================
 	//internal fn
 
-	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymKeyFormatInt>, bool)
+	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymmetricKey>, bool)
 	{
 		prepare_group_keys_ref!(self.keys, page, 50)
 	}
@@ -358,7 +357,7 @@ impl Group
 		self.key_map.reserve(keys_len);
 	}
 
-	pub fn set_keys(&mut self, private_key: &PrivateKeyFormatInt, key: GroupKeyServerOutput) -> Result<(), SentcError>
+	pub fn set_keys(&mut self, private_key: &SecretKey, key: GroupKeyServerOutput) -> Result<(), SentcError>
 	{
 		let key = decrypt_group_keys(private_key, key)?;
 		self.key_map
