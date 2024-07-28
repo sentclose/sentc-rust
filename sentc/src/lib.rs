@@ -1,12 +1,10 @@
-#[cfg(feature = "network")]
-pub mod cache;
 pub mod error;
 #[cfg(feature = "file")]
 pub mod file;
 pub mod group;
+pub mod keys;
 #[cfg(feature = "network")]
-mod net_helper;
-pub mod sentc;
+pub mod net_helper;
 pub mod user;
 
 use std::collections::HashMap;
@@ -16,18 +14,14 @@ pub use sentc_crypto::{entities as crypto_entities, sdk_common as crypto_common}
 
 pub type KeyMap = HashMap<SymKeyId, usize>;
 
-macro_rules! decrypt_hmac_key {
-	($key:expr, $self:expr, $hmac_key:expr) => {
-		let decrypted_hmac_key = sentc_crypto::group::decrypt_group_hmac_key($key, $hmac_key)?;
-		$self.hmac_keys.push(decrypted_hmac_key);
-	};
+pub fn split_head_and_encrypted_data<'a, T: serde::Deserialize<'a>>(data_with_head: &'a [u8]) -> Result<(T, &[u8]), error::SentcError>
+{
+	Ok(sentc_crypto::crypto::split_head_and_encrypted_data(data_with_head)?)
 }
 
-macro_rules! decrypt_sort_key {
-	($key:expr, $self:expr, $sort_key:expr) => {
-		let decrypted_key = sentc_crypto::group::decrypt_group_sortable_key($key, $sort_key)?;
-		$self.sortable_keys.push(decrypted_key);
-	};
+pub fn split_head_and_encrypted_string(encrypted_data_with_head: &str) -> Result<crypto_common::crypto::EncryptedHead, error::SentcError>
+{
+	Ok(sentc_crypto::crypto::split_head_and_encrypted_string(
+		encrypted_data_with_head,
+	)?)
 }
-
-use {decrypt_hmac_key, decrypt_sort_key};
