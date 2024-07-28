@@ -17,22 +17,25 @@ include = [
 ]
 
 [dependencies]
-sentc-crypto = {workspace=true, features = ["rust"]}
+sentc-crypto = { workspace = true }
 
 # json handling
 serde_json.workspace = true
 serde.workspace = true
 
-# network dependencies
-sentc-crypto-full = {workspace = true, optional=true}
-
-tokio = {workspace=true, optional=true}
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
-tokio = {version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false}
+tokio = { version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false }
 totp-rs = "5.0"
 dotenv = "0.15.0"
 
 [features]
-network = ["sentc-crypto-full", "tokio"]
+network = ["sentc-crypto/full_rustls", "tokio"]
 file = ["tokio/fs"]
+
+std_keys = ["sentc-crypto/std_keys"]
+
+fips_keys = ["sentc-crypto/fips_keys"]
+
+rec_keys = ["sentc-crypto/rec_keys"]
