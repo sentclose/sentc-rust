@@ -1,15 +1,29 @@
+use std::future::Future;
 use std::path::{Path, MAIN_SEPARATOR_STR};
 
-use sentc_crypto::entities::keys::SymmetricKey;
 use sentc_crypto::sdk_common::file::FileData;
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
-use sentc_crypto_full::file::{delete_file, update_file_name};
+use sentc_crypto::sdk_core::cryptomat::{PwHash, SearchableKeyGen, SortableKeyGen};
+use sentc_crypto::sdk_utils::cryptomat::{
+	PkFromUserKeyWrapper,
+	SearchableKeyComposerWrapper,
+	SignComposerWrapper,
+	SignKeyPairWrapper,
+	SortableKeyComposerWrapper,
+	StaticKeyComposerWrapper,
+	StaticKeyPairWrapper,
+	SymKeyComposerWrapper,
+	SymKeyCrypto,
+	SymKeyGenWrapper,
+	SymKeyWrapper,
+	VerifyKFromUserKeyWrapper,
+};
+use sentc_crypto::util_req_full::file::{delete_file, update_file_name};
 use tokio::fs::File;
 
-use crate::cache::l_one::L1Cache;
 use crate::error::SentcError;
-use crate::file::downloader_net::{check_if_file_exists, download_file_meta_information, download_parts};
-use crate::file::uploader_net::upload_file;
+use crate::file::downloader_net::{check_if_file_exists, download_file_meta_information, FileEncryptorDownload};
+use crate::file::uploader_net::FileEncryptorUpload;
 use crate::file::DefaultCallback;
 use crate::group::Group;
 
@@ -20,57 +34,47 @@ pub struct FileCreateOutput
 	pub encrypted_file_name: Option<String>,
 }
 
-pub struct FileDownloadOutput
+pub struct FileDownloadOutput<S: SymKeyWrapper>
 {
 	pub file_data: FileData,
-	pub key: SymmetricKey,
+	pub key: S,
 	pub file_name: Option<String>,
 }
 
-impl Group
+impl<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+	Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+where
+	SGen: SymKeyGenWrapper,
+	StGen: StaticKeyPairWrapper,
+	SignGen: SignKeyPairWrapper,
+	SearchGen: SearchableKeyGen,
+	SortGen: SortableKeyGen,
+	SC: SymKeyComposerWrapper,
+	StC: StaticKeyComposerWrapper,
+	SignC: SignComposerWrapper,
+	SearchC: SearchableKeyComposerWrapper,
+	SortC: SortableKeyComposerWrapper,
+	PC: PkFromUserKeyWrapper,
+	VC: VerifyKFromUserKeyWrapper,
+	PwH: PwHash,
 {
 	async fn create_file_internally(
 		&self,
+		jwt: &str,
 		file: File,
 		file_name: Option<String>,
-		sign: bool,
+		file_part_url: Option<String>,
+		sign_key: Option<&SignC::SignKWrapper>,
 		upload_callback: Option<impl Fn(u32)>,
-		c: &L1Cache,
 	) -> Result<FileCreateOutput, SentcError>
 	{
-		let user = c
-			.get_user(&self.used_user_id)
-			.await
-			.ok_or(SentcError::UserNotFound)?;
-
-		let mut user_write = user.write().await;
-
-		user_write.check_jwt(c).await?;
-
-		//drop the suer and get the jwt from read guard to not block the user
-		// just in case if other needs to read while the file is uploading.
-		drop(user_write);
-
 		let (key, encrypted_key) = self.generate_non_registered_key()?;
 
-		let user_read = user.read().await;
-		let jwt = user_read.get_jwt_sync();
-
-		let sign_key = if sign {
-			Some(
-				user_read
-					.get_newest_sign_key()
-					.ok_or(SentcError::KeyNotFound)?,
-			)
-		} else {
-			None
-		};
-
-		let (file_id, encrypted_file_name) = upload_file(
+		let (file_id, encrypted_file_name) = FileEncryptorUpload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::upload_file(
 			file,
 			file_name,
 			&self.base_url,
-			c.file_part_url.clone(),
+			file_part_url,
 			&self.app_token,
 			jwt,
 			&key,
@@ -90,7 +94,13 @@ impl Group
 		})
 	}
 
-	pub async fn create_file_with_path(&self, path: &str, sign: bool, c: &L1Cache) -> Result<FileCreateOutput, SentcError>
+	pub async fn create_file_with_path(
+		&self,
+		jwt: &str,
+		path: &str,
+		file_part_url: Option<String>,
+		sign_key: Option<&SignC::SignKWrapper>,
+	) -> Result<FileCreateOutput, SentcError>
 	{
 		let file = File::open(path).await.map_err(SentcError::FileReadError)?;
 
@@ -99,23 +109,29 @@ impl Group
 			.and_then(|n| n.to_str())
 			.map(|n| n.to_string());
 
-		self.create_file_internally(file, file_name, sign, None::<DefaultCallback>, c)
+		self.create_file_internally(jwt, file, file_name, file_part_url, sign_key, None::<DefaultCallback>)
 			.await
 	}
 
-	pub async fn create_file_with_file(&self, file: File, file_name: Option<String>, sign: bool, c: &L1Cache)
-		-> Result<FileCreateOutput, SentcError>
+	pub fn create_file_with_file<'a>(
+		&'a self,
+		jwt: &'a str,
+		file: File,
+		file_name: Option<String>,
+		file_part_url: Option<String>,
+		sign_key: Option<&'a SignC::SignKWrapper>,
+	) -> impl Future<Output = Result<FileCreateOutput, SentcError>> + 'a
 	{
-		self.create_file_internally(file, file_name, sign, None::<DefaultCallback>, c)
-			.await
+		self.create_file_internally(jwt, file, file_name, file_part_url, sign_key, None::<DefaultCallback>)
 	}
 
 	pub async fn create_file_with_path_and_upload_progress(
 		&self,
+		jwt: &str,
 		path: &str,
-		sign: bool,
+		file_part_url: Option<String>,
+		sign_key: Option<&SignC::SignKWrapper>,
 		upload_callback: impl Fn(u32),
-		c: &L1Cache,
 	) -> Result<FileCreateOutput, SentcError>
 	{
 		let file = File::open(path).await.map_err(SentcError::FileReadError)?;
@@ -125,49 +141,33 @@ impl Group
 			.and_then(|n| n.to_str())
 			.map(|n| n.to_string());
 
-		self.create_file_internally(file, file_name, sign, Some(upload_callback), c)
+		self.create_file_internally(jwt, file, file_name, file_part_url, sign_key, Some(upload_callback))
 			.await
 	}
 
-	pub async fn create_file_with_file_and_upload_progress(
-		&self,
+	pub async fn create_file_with_file_and_upload_progress<'a>(
+		&'a self,
+		jwt: &'a str,
 		file: File,
 		file_name: Option<String>,
-		sign: bool,
-		upload_callback: impl Fn(u32),
-		c: &L1Cache,
-	) -> Result<FileCreateOutput, SentcError>
+		file_part_url: Option<String>,
+		sign_key: Option<&'a SignC::SignKWrapper>,
+		upload_callback: impl Fn(u32) + 'a,
+	) -> impl Future<Output = Result<FileCreateOutput, SentcError>> + 'a
 	{
-		self.create_file_internally(file, file_name, sign, Some(upload_callback), c)
-			.await
+		self.create_file_internally(jwt, file, file_name, file_part_url, sign_key, Some(upload_callback))
 	}
 
 	//______________________________________________________________________________________________
 	//download
 
 	pub async fn get_file_meta(
-		&mut self,
+		&self,
+		jwt: &str,
 		file_id: &str,
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
-	) -> Result<(FileData, SymmetricKey, Option<String>), SentcError>
+	) -> Result<(FileData, SC::SymmetricKeyWrapper, Option<String>), SentcError>
 	{
-		let user = c
-			.get_user(&self.used_user_id)
-			.await
-			.ok_or(SentcError::UserNotFound)?;
-
-		let mut user_write = user.write().await;
-
-		user_write.check_jwt(c).await?;
-
-		//drop the suer and get the jwt from read guard to not block the user
-		// just in case if other needs to read while the file is uploading.
-		drop(user_write);
-
-		let user_read = user.read().await;
-		let jwt = user_read.get_jwt_sync();
-
 		let meta = download_file_meta_information(
 			&self.base_url,
 			&self.app_token,
@@ -178,13 +178,8 @@ impl Group
 		)
 		.await?;
 
-		//drop here to fetch the group key
-		drop(user_read);
-
 		//the user in get_non_registered_key should be dropped in the fn
-		let key = self
-			.get_non_registered_key(&meta.master_key_id, &meta.encrypted_key, c)
-			.await?;
+		let key = self.get_non_registered_key_sync(&meta.master_key_id, &meta.encrypted_key)?;
 
 		let file_name = if let Some(file_name) = &meta.encrypted_file_name {
 			Some(key.decrypt_string(file_name, verify_key)?)
@@ -199,16 +194,16 @@ impl Group
 		&self,
 		file: File,
 		file_meta: FileData,
-		content_key: &SymmetricKey,
+		content_key: &impl SymKeyWrapper,
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
+		file_part_url: Option<String>,
 	) -> Result<(), SentcError>
 	{
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			content_key,
 			&file_meta.part_list,
 			None::<DefaultCallback>,
@@ -221,17 +216,17 @@ impl Group
 		&self,
 		file: File,
 		file_meta: FileData,
-		content_key: &SymmetricKey,
+		content_key: &impl SymKeyWrapper,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
+		file_part_url: Option<String>,
 	) -> Result<(), SentcError>
 	{
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			content_key,
 			&file_meta.part_list,
 			Some(upload_callback),
@@ -241,20 +236,21 @@ impl Group
 	}
 
 	pub async fn download_file(
-		&mut self,
+		&self,
+		jwt: &str,
 		file: File,
 		file_id: &str,
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
-	) -> Result<FileDownloadOutput, SentcError>
+		file_part_url: Option<String>,
+	) -> Result<FileDownloadOutput<SC::SymmetricKeyWrapper>, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(jwt, file_id, verify_key).await?;
 
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			&content_key,
 			&meta.part_list,
 			None::<DefaultCallback>,
@@ -270,21 +266,22 @@ impl Group
 	}
 
 	pub async fn download_file_with_progress(
-		&mut self,
+		&self,
+		jwt: &str,
 		file: File,
 		file_id: &str,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
-	) -> Result<FileDownloadOutput, SentcError>
+		file_part_url: Option<String>,
+	) -> Result<FileDownloadOutput<SC::SymmetricKeyWrapper>, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(jwt, file_id, verify_key).await?;
 
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			&content_key,
 			&meta.part_list,
 			Some(upload_callback),
@@ -300,14 +297,15 @@ impl Group
 	}
 
 	pub async fn download_file_with_path(
-		&mut self,
+		&self,
+		jwt: &str,
 		path: &str,
 		file_id: &str,
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
-	) -> Result<FileDownloadOutput, SentcError>
+		file_part_url: Option<String>,
+	) -> Result<FileDownloadOutput<SC::SymmetricKeyWrapper>, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(jwt, file_id, verify_key).await?;
 
 		let file_name = decrypted_file_name.as_deref().unwrap_or("file");
 
@@ -319,11 +317,11 @@ impl Group
 			.await
 			.map_err(SentcError::FileReadError)?;
 
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			&content_key,
 			&meta.part_list,
 			None::<DefaultCallback>,
@@ -339,15 +337,16 @@ impl Group
 	}
 
 	pub async fn download_file_with_path_with_progress(
-		&mut self,
+		&self,
+		jwt: &str,
 		path: &str,
 		file_id: &str,
 		upload_callback: impl Fn(u32),
 		verify_key: Option<&UserVerifyKeyData>,
-		c: &L1Cache,
-	) -> Result<FileDownloadOutput, SentcError>
+		file_part_url: Option<String>,
+	) -> Result<FileDownloadOutput<SC::SymmetricKeyWrapper>, SentcError>
 	{
-		let (meta, content_key, decrypted_file_name) = self.get_file_meta(file_id, verify_key, c).await?;
+		let (meta, content_key, decrypted_file_name) = self.get_file_meta(jwt, file_id, verify_key).await?;
 
 		let file_name = decrypted_file_name.as_deref().unwrap_or("file");
 
@@ -359,11 +358,11 @@ impl Group
 			.await
 			.map_err(SentcError::FileReadError)?;
 
-		download_parts(
+		FileEncryptorDownload::<SGen::KeyGen, SC::Composer, SignC::SignKWrapper, VC>::download_parts(
 			file,
 			&self.base_url,
 			&self.app_token,
-			c.file_part_url.clone(),
+			file_part_url,
 			&content_key,
 			&meta.part_list,
 			Some(upload_callback),
@@ -380,18 +379,14 @@ impl Group
 
 	//______________________________________________________________________________________________
 
-	pub async fn update_file_name(&self, file_id: &str, content_key: &SymmetricKey, file_name: Option<String>, c: &L1Cache)
-		-> Result<(), SentcError>
+	pub async fn update_file_name(
+		&self,
+		jwt: &str,
+		file_id: &str,
+		content_key: &impl SymKeyWrapper,
+		file_name: Option<String>,
+	) -> Result<(), SentcError>
 	{
-		let user = c
-			.get_user(&self.used_user_id)
-			.await
-			.ok_or(SentcError::UserNotFound)?;
-
-		let mut user_write = user.write().await;
-
-		let jwt = user_write.get_jwt(c).await?;
-
 		Ok(update_file_name(
 			self.base_url.clone(),
 			&self.app_token,
@@ -403,17 +398,8 @@ impl Group
 		.await?)
 	}
 
-	pub async fn delete_file(&self, file_id: &str, c: &L1Cache) -> Result<(), SentcError>
+	pub async fn delete_file(&self, jwt: &str, file_id: &str) -> Result<(), SentcError>
 	{
-		let user = c
-			.get_user(&self.used_user_id)
-			.await
-			.ok_or(SentcError::UserNotFound)?;
-
-		let mut user_write = user.write().await;
-
-		let jwt = user_write.get_jwt(c).await?;
-
 		Ok(delete_file(
 			self.base_url.clone(),
 			&self.app_token,
