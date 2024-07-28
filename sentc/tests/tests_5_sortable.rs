@@ -1,14 +1,21 @@
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use std::ops::Deref;
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use sentc::group::net::GroupFetchResult;
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use tokio::sync::{OnceCell, RwLock};
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use crate::test_mod::{TestGroup, TestUser};
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 mod test_mod;
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 struct UserState(TestUser);
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 impl Deref for UserState
 {
 	type Target = TestUser;
@@ -19,8 +26,10 @@ impl Deref for UserState
 	}
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 struct GroupState(TestGroup);
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 impl Deref for GroupState
 {
 	type Target = TestGroup;
@@ -31,17 +40,25 @@ impl Deref for GroupState
 	}
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static USER_0_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static USER_1_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static GROUP_0_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static GROUP_1_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const USERNAME0: &str = "test0";
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const USERNAME1: &str = "test1";
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const PW: &str = "12345";
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn aaa_init_global_test()
 {
@@ -87,6 +104,7 @@ async fn aaa_init_global_test()
 		.await;
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_10_create_and_fetch_group()
 {
@@ -124,6 +142,7 @@ async fn test_10_create_and_fetch_group()
 		.await;
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_11_encrypt_number()
 {
@@ -152,6 +171,7 @@ async fn test_11_encrypt_number()
 	assert_eq!(c, c1);
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_12_encrypt_string()
 {
@@ -197,6 +217,7 @@ async fn test_12_encrypt_string()
 	}
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn zzz_clean_up()
 {

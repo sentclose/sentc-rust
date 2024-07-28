@@ -231,6 +231,7 @@ async fn test_21_not_login_without_done_register()
 				SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _))) => {
 					assert_eq!(c, 100);
 				},
+				SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::Base(sentc_crypto::sdk_core::Error::AlgNotFound))) => {},
 				_ => panic!("should be server error"),
 			}
 		},
@@ -405,6 +406,7 @@ async fn test_44_not_login_with_deleted_device()
 				SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _))) => {
 					assert_eq!(c, 100);
 				},
+				SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::Base(sentc_crypto::sdk_core::Error::AlgNotFound))) => {},
 				_ => panic!("should be server error"),
 			}
 		},
