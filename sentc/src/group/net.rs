@@ -481,7 +481,9 @@ where
 		for key in keys {
 			let pre_key = self
 				.get_group_key(&key.previous_group_key_id)
-				.ok_or(SentcError::ParentGroupKeyNotFoundButRequired)?;
+				.ok_or(SentcError::ParentGroupKeyNotFoundButRequired(
+					key.previous_group_key_id.clone(),
+				))?;
 
 			let vk = match (&verify, &key.signed_by_user_sign_key_id) {
 				(Some(vk), Some(_)) => Some(vk),
