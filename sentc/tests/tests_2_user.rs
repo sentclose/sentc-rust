@@ -1,20 +1,18 @@
-use std::sync::Arc;
-
 use sentc::error::SentcError;
-use sentc::sentc::net::UserLoginReturn;
-use sentc::sentc::Sentc;
-use sentc::user::User;
 use tokio::sync::{OnceCell, RwLock};
 use totp_rs::{Algorithm, Secret, TOTP};
 
+use crate::test_mod::{TestUser, TestUserLoginReturn};
+
+mod test_mod;
+
 struct UserState
 {
-	inner: Arc<RwLock<User>>,
+	inner: TestUser,
 	otp_sec: String,
 	recovery: Vec<String>,
 }
 
-static SENTC: OnceCell<Sentc> = OnceCell::const_new();
 static USER_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
 
 const USERNAME: &str = "test";
@@ -28,17 +26,23 @@ fn get_totp(sec: String) -> TOTP
 #[tokio::test]
 async fn aaa_init_global_test()
 {
-	let sentc = Sentc::init(
-		"http://127.0.0.1:3002",
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
 		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
-		None,
-		None,
+		USERNAME,
+		PW,
 	)
-	.await;
+	.await
+	.unwrap();
 
-	sentc.register(USERNAME, PW).await.unwrap();
-
-	let user = sentc.login_forced(USERNAME, PW).await.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	USER_TEST_STATE
 		.get_or_init(|| {
@@ -52,22 +56,14 @@ async fn aaa_init_global_test()
 			}
 		})
 		.await;
-
-	SENTC.get_or_init(|| async move { sentc }).await;
 }
 
 #[tokio::test]
 async fn test_10_register_otp()
 {
 	let mut u = USER_TEST_STATE.get().unwrap().write().await;
-	let mut uw = u.inner.write().await;
 
-	let out = uw
-		.register_raw_otp(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
-
-	drop(uw);
+	let out = u.inner.register_raw_otp(PW, None, None).await.unwrap();
 
 	u.otp_sec = out.secret;
 	u.recovery = out.recover;
@@ -76,7 +72,13 @@ async fn test_10_register_otp()
 #[tokio::test]
 async fn test_11_not_login_without_otp()
 {
-	let err = SENTC.get().unwrap().login_forced(USERNAME, PW).await;
+	let err = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await;
 
 	match err {
 		Err(SentcError::UserMfaRequired) => {},
@@ -87,26 +89,36 @@ async fn test_11_not_login_without_otp()
 #[tokio::test]
 async fn test_12_login_with_otp()
 {
-	let u = SENTC.get().unwrap().login(USERNAME, PW).await.unwrap();
+	let u = TestUser::login(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	match u {
-		UserLoginReturn::Direct(_) => {
+		TestUserLoginReturn::Direct(_) => {
 			panic!("should not be direct login")
 		},
-		UserLoginReturn::Otp(d) => {
+		TestUserLoginReturn::Otp(d) => {
 			let u = USER_TEST_STATE.get().unwrap().read().await;
 			//create a token
 			let totp = get_totp(u.otp_sec.clone());
 			let token = totp.generate_current().unwrap();
 
-			let user = SENTC
-				.get()
-				.unwrap()
-				.mfa_login(token, USERNAME, d)
-				.await
-				.unwrap();
+			let user = TestUser::mfa_login(
+				"http://127.0.0.1:3002".into(),
+				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+				token,
+				USERNAME,
+				d,
+			)
+			.await
+			.unwrap();
 
-			assert!(user.read().await.get_mfa());
+			assert!(user.get_mfa());
 		},
 	}
 }
@@ -119,9 +131,8 @@ async fn test_13_get_all_recover_keys()
 	let totp = get_totp(u.otp_sec.clone());
 	let token = totp.generate_current().unwrap();
 
-	let uw = u.inner.read().await;
-
-	let keys = uw
+	let keys = u
+		.inner
 		.get_otp_recover_keys(PW, Some(token), Some(false))
 		.await
 		.unwrap();
@@ -132,23 +143,33 @@ async fn test_13_get_all_recover_keys()
 #[tokio::test]
 async fn test_14_login_with_recovery_key()
 {
-	let u = SENTC.get().unwrap().login(USERNAME, PW).await.unwrap();
+	let u = TestUser::login(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	match u {
-		UserLoginReturn::Direct(_) => {
+		TestUserLoginReturn::Direct(_) => {
 			panic!("should not be direct login")
 		},
-		UserLoginReturn::Otp(d) => {
+		TestUserLoginReturn::Otp(d) => {
 			let u = USER_TEST_STATE.get().unwrap().read().await;
 
-			let user = SENTC
-				.get()
-				.unwrap()
-				.mfa_recovery_login(u.recovery[0].clone(), USERNAME, d)
-				.await
-				.unwrap();
+			let user = TestUser::mfa_recovery_login(
+				"http://127.0.0.1:3002".into(),
+				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+				u.recovery[0].clone(),
+				USERNAME,
+				d,
+			)
+			.await
+			.unwrap();
 
-			assert!(user.read().await.get_mfa());
+			assert!(user.get_mfa());
 		},
 	}
 }
@@ -161,9 +182,8 @@ async fn test_15_get_one_recovery_key_less()
 	let totp = get_totp(u.otp_sec.clone());
 	let token = totp.generate_current().unwrap();
 
-	let uw = u.inner.read().await;
-
-	let keys = uw
+	let keys = u
+		.inner
 		.get_otp_recover_keys(PW, Some(token), Some(false))
 		.await
 		.unwrap();
@@ -179,14 +199,11 @@ async fn test_16_reset_otp()
 	let totp = get_totp(u.otp_sec.clone());
 	let token = totp.generate_current().unwrap();
 
-	let uw = u.inner.read().await;
-
-	let out = uw
+	let out = u
+		.inner
 		.reset_raw_otp(PW, Some(token), Some(false))
 		.await
 		.unwrap();
-
-	drop(uw);
 
 	u.otp_sec = out.secret;
 	u.recovery = out.recover;
@@ -200,9 +217,8 @@ async fn test_17_get_all_keys_back()
 	let totp = get_totp(u.otp_sec.clone());
 	let token = totp.generate_current().unwrap();
 
-	let uw = u.inner.read().await;
-
-	let keys = uw
+	let keys = u
+		.inner
 		.get_otp_recover_keys(PW, Some(token), Some(false))
 		.await
 		.unwrap();
@@ -213,24 +229,32 @@ async fn test_17_get_all_keys_back()
 #[tokio::test]
 async fn test_30_disable_otp()
 {
-	let u = USER_TEST_STATE.get().unwrap().read().await;
+	let mut u = USER_TEST_STATE.get().unwrap().write().await;
 	//create a token
 	let totp = get_totp(u.otp_sec.clone());
 	let token = totp.generate_current().unwrap();
 
-	let mut uw = u.inner.write().await;
-
-	uw.disable_otp(PW, Some(token), Some(false)).await.unwrap();
+	u.inner
+		.disable_otp(PW, Some(token), Some(false))
+		.await
+		.unwrap();
 }
 
 #[tokio::test]
 async fn test_31_login_without_otp()
 {
-	let u = SENTC.get().unwrap().login(USERNAME, PW).await.unwrap();
+	let u = TestUser::login(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	match u {
-		UserLoginReturn::Direct(_) => {},
-		UserLoginReturn::Otp(_) => {
+		TestUserLoginReturn::Direct(_) => {},
+		TestUserLoginReturn::Otp(_) => {
 			panic!("should not be otp login")
 		},
 	}
@@ -241,9 +265,5 @@ async fn zzz_clean_up()
 {
 	let u = USER_TEST_STATE.get().unwrap().read().await;
 
-	let ur = u.inner.read().await;
-
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	u.inner.delete(PW, None, None).await.unwrap();
 }

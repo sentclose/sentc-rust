@@ -1,19 +1,19 @@
-use std::ops::Deref;
-use std::sync::Arc;
+use std::ops::{Deref, DerefMut};
 
-use sentc::cache::l_one::L1Cache;
 use sentc::error::SentcError;
-use sentc::group::Group;
-use sentc::sentc::Sentc;
-use sentc::user::User;
+use sentc::group::net::{GroupFetchResult, GroupKeyFetchResult};
 use sentc_crypto::SdkError;
 use tokio::sync::{OnceCell, RwLock};
 
-struct UserState(Arc<RwLock<User>>);
+use crate::test_mod::{TestGroup, TestUser};
+
+mod test_mod;
+
+struct UserState(TestUser);
 
 impl Deref for UserState
 {
-	type Target = Arc<RwLock<User>>;
+	type Target = TestUser;
 
 	fn deref(&self) -> &Self::Target
 	{
@@ -21,15 +21,23 @@ impl Deref for UserState
 	}
 }
 
-struct GroupState(Arc<RwLock<Group>>);
+struct GroupState(TestGroup);
 
 impl Deref for GroupState
 {
-	type Target = Arc<RwLock<Group>>;
+	type Target = TestGroup;
 
 	fn deref(&self) -> &Self::Target
 	{
 		&self.0
+	}
+}
+
+impl DerefMut for GroupState
+{
+	fn deref_mut(&mut self) -> &mut Self::Target
+	{
+		&mut self.0
 	}
 }
 
@@ -44,8 +52,6 @@ static GROUP_2_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static CONNECTED_GROUP: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static CONNECTED_CHILD_GROUP: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
-static SENTC: OnceCell<Sentc> = OnceCell::const_new();
-
 const USERNAME0: &str = "test0";
 const USERNAME1: &str = "test1";
 const USERNAME2: &str = "test2";
@@ -55,85 +61,108 @@ const PW: &str = "12345";
 #[tokio::test]
 async fn aaa_init_global_test()
 {
-	let sentc = Sentc::init(
-		"http://127.0.0.1:3002",
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
 		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
-		None,
-		None,
+		USERNAME0,
+		PW,
 	)
-	.await;
-
-	sentc.register(USERNAME0, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME0, PW).await.unwrap();
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME0,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	USER_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
 
-	sentc.register(USERNAME1, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME1, PW).await.unwrap();
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
 	USER_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
 
-	sentc.register(USERNAME2, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME2, PW).await.unwrap();
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME2,
+		PW,
+	)
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME2,
+		PW,
+	)
+	.await
+	.unwrap();
 	USER_2_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
-
-	SENTC.get_or_init(|| async move { sentc }).await;
 }
 
 #[tokio::test]
 async fn test_10_create_and_fetch_group()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	let group_id = uw
-		.create_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let group_id = u.create_group().await.unwrap();
 
-	let group = uw
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, None).unwrap();
 
 	GROUP_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
 		.await;
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	let group_id = uw
-		.create_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let group_id = u.create_group().await.unwrap();
 
-	let group = uw
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, None).unwrap();
 
 	GROUP_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
 		.await;
 
 	let u = USER_2_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	let group_id = uw
-		.create_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let group_id = u.create_group().await.unwrap();
 
-	let group = uw
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, None).unwrap();
 
 	GROUP_2_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -144,24 +173,27 @@ async fn test_10_create_and_fetch_group()
 async fn test_11_create_connected_group()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let id = g
-		.create_connected_group(SENTC.get().unwrap().get_cache())
+		.create_connected_group(u0.get_jwt().unwrap())
 		.await
 		.unwrap();
 
-	let con_group = g
-		.get_connected_group(&id, SENTC.get().unwrap().get_cache())
+	let (data, res) = g
+		.prepare_get_connected_group(&id, u0.get_jwt().unwrap())
 		.await
 		.unwrap();
 
-	let g1 = con_group.read().await;
+	assert!(matches!(res, GroupFetchResult::Ok));
 
-	assert_eq!(g1.get_group_id(), id);
-	assert_eq!(g1.access_by_group_as_member(), Some(&g.get_group_id().to_string()));
+	let con_group = g.done_get_connected_group(data).unwrap();
 
-	drop(g1);
+	assert_eq!(con_group.get_group_id(), id);
+	assert_eq!(
+		con_group.access_by_group_as_member(),
+		Some(&g.get_group_id().to_string())
+	);
 
 	CONNECTED_GROUP
 		.get_or_init(|| async move { RwLock::new(GroupState(con_group)) })
@@ -171,13 +203,32 @@ async fn test_11_create_connected_group()
 #[tokio::test]
 async fn test_12_key_rotation_in_connected_group()
 {
-	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let mut g = g.write().await;
+	let mut g = CONNECTED_GROUP.get().unwrap().write().await;
+	let pg = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let old_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
-	g.key_rotation(false, SENTC.get().unwrap().get_cache())
+	let res = g
+		.prepare_key_rotation(
+			u0.get_jwt().unwrap(),
+			false,
+			u0.get_user_id().to_string(),
+			None,
+			Some(&pg.0),
+		)
 		.await
+		.unwrap();
+
+	//end the rotation by fetching the new key
+	let data = match res {
+		GroupKeyFetchResult::Ok(data) => data,
+		_ => {
+			panic!("should be no missing key or done");
+		},
+	};
+
+	g.done_fetch_group_key_after_rotation(data, None, Some(&pg.0))
 		.unwrap();
 
 	let new_key = &g.get_newest_key().unwrap().group_key.key_id;
@@ -189,17 +240,13 @@ async fn test_12_key_rotation_in_connected_group()
 async fn test_13_not_access_connected_group_directly()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	//user got only access via connected group and not direct
 
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
 	//do not use group as member for this test
-	let err = uw
-		.get_group(g.get_group_id(), None, SENTC.get().unwrap().get_cache())
-		.await;
+	let err = u.prepare_get_group(g.get_group_id(), None).await;
 
 	match err {
 		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
@@ -213,24 +260,19 @@ async fn test_13_not_access_connected_group_directly()
 async fn test_14_access_group_from_user_with_group()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	let group = uw
-		.get_group(
-			g.get_group_id(),
-			Some(g1.get_group_id()),
-			SENTC.get().unwrap().get_cache(),
-		)
+	let (data, res) = u
+		.prepare_get_group(g.get_group_id(), Some(&g1.0))
 		.await
 		.unwrap();
 
-	let group = group.read().await;
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, Some(&g1.0)).unwrap();
 
 	assert_eq!(group.get_group_id(), g.get_group_id());
 	assert_eq!(group.get_access_group_as_member(), g.get_access_group_as_member())
@@ -240,18 +282,12 @@ async fn test_14_access_group_from_user_with_group()
 async fn test_15_not_access_connected_group_without_group_access()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	//use an empty cache because the cache of the connected group already exists
-	let err = uw
-		.get_group(g.get_group_id(), Some(g1.get_group_id()), &L1Cache::new())
-		.await;
+	let err = u.prepare_get_group(g.get_group_id(), Some(&g1)).await;
 
 	match err {
 		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
@@ -265,26 +301,22 @@ async fn test_15_not_access_connected_group_without_group_access()
 async fn test_16_create_child_group_from_connected_group()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
-	let id = g
-		.create_child_group(SENTC.get().unwrap().get_cache())
+	let id = g.create_child_group(u0.get_jwt().unwrap()).await.unwrap();
+
+	let (data, res) = g
+		.prepare_get_child_group(&id, u0.get_jwt().unwrap())
 		.await
 		.unwrap();
 
-	let group = g
-		.get_child_group(&id, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let gr = group.read().await;
+	let group = g.done_get_child_group(data).unwrap();
 
-	assert_eq!(gr.get_access_group_as_member().unwrap(), g1.get_group_id());
-
-	drop(gr);
+	assert_eq!(group.get_access_group_as_member().unwrap(), g1.get_group_id());
 
 	CONNECTED_CHILD_GROUP
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -295,39 +327,62 @@ async fn test_16_create_child_group_from_connected_group()
 async fn test_17_invite_user_to_main_group_to_check_access()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = CONNECTED_CHILD_GROUP.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let gp = CONNECTED_GROUP.get().unwrap().read().await;
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let mut u = u.write().await;
 
-	g.invite_auto(u.get_user_id(), None, SENTC.get().unwrap().get_cache())
+	let pk = u0.get_user_public_key_data(u.get_user_id()).await.unwrap();
+
+	g.invite_auto(u0.get_jwt().unwrap(), u.get_user_id(), &pk, None)
 		.await
 		.unwrap();
 
-	//access the child connected group without loading the other groups before (use an empty cache)
-	let gc = u
-		.get_group(g1.get_group_id(), Some(g.get_group_id()), &L1Cache::new())
+	//__________________________________________________________
+
+	let (data, res) = u.prepare_get_group(g.get_group_id(), None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let gu = u.done_get_group(data, None).unwrap();
+
+	let (data, res) = u
+		.prepare_get_group(gp.get_group_id(), Some(&gu))
 		.await
 		.unwrap();
 
-	let gc = gc.read().await;
+	assert!(matches!(res, GroupFetchResult::Ok));
 
-	assert_eq!(gc.get_access_group_as_member().unwrap(), g.get_group_id());
+	let cgp = u.done_get_group(data, Some(&gu)).unwrap();
+
+	let (data, res) = cgp
+		.prepare_get_child_group(g1.get_group_id(), u.get_jwt().unwrap())
+		.await
+		.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = cgp.done_get_child_group(data).unwrap();
+
+	assert_eq!(group.get_access_group_as_member().unwrap(), g.get_group_id());
 }
 
 #[tokio::test]
 async fn test_18_invite_group_as_member()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_2_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
-	g.invite_group_auto(g1.get_group_id(), None, SENTC.get().unwrap().get_cache())
+	let pk = u0
+		.get_group_public_key_data(g1.get_group_id())
+		.await
+		.unwrap();
+
+	g.invite_group_auto(u0.get_jwt().unwrap(), g1.get_group_id(), &pk, None)
 		.await
 		.unwrap();
 }
@@ -336,12 +391,16 @@ async fn test_18_invite_group_as_member()
 async fn test_19_re_invite_group_as_member()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_2_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
-	g.re_invite_group(g1.get_group_id(), SENTC.get().unwrap().get_cache())
+	let pk = u0
+		.get_group_public_key_data(g1.get_group_id())
+		.await
+		.unwrap();
+
+	g.re_invite_group(u0.get_jwt().unwrap(), g1.get_group_id(), &pk)
 		.await
 		.unwrap();
 }
@@ -350,36 +409,36 @@ async fn test_19_re_invite_group_as_member()
 async fn test_20_access_group_after_invite()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_2_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let u2 = USER_2_TEST_STATE.get().unwrap().read().await;
 
-	let g3 = g1
-		.get_connected_group(g.get_group_id(), SENTC.get().unwrap().get_cache())
+	let (data, res) = g1
+		.prepare_get_connected_group(g.get_group_id(), u2.get_jwt().unwrap())
 		.await
 		.unwrap();
 
-	let gr = g3.read().await;
+	assert!(matches!(res, GroupFetchResult::Ok));
 
-	assert_eq!(gr.get_access_group_as_member().unwrap(), g1.get_group_id());
+	let g3 = g1.done_get_connected_group(data).unwrap();
+
+	assert_eq!(g3.get_access_group_as_member().unwrap(), g1.get_group_id());
 }
 
 #[tokio::test]
 async fn test_21_send_join_req_from_2nd_group_to_new_group()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
 
-	g1.group_join_request(g.get_group_id(), SENTC.get().unwrap().get_cache())
+	g1.group_join_request(u1.get_jwt().unwrap(), g.get_group_id())
 		.await
 		.unwrap();
 
 	let joins = g1
-		.get_group_sent_join_req(SENTC.get().unwrap().get_cache(), None)
+		.get_group_sent_join_req(u1.get_jwt().unwrap(), None)
 		.await
 		.unwrap();
 
@@ -391,13 +450,12 @@ async fn test_21_send_join_req_from_2nd_group_to_new_group()
 async fn test_22_get_join_req_on_list_in_group()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
 	let joins = g
-		.get_join_requests(None, SENTC.get().unwrap().get_cache())
+		.get_join_requests(u0.get_jwt().unwrap(), None)
 		.await
 		.unwrap();
 
@@ -410,12 +468,11 @@ async fn test_22_get_join_req_on_list_in_group()
 async fn test_23_reject_join_req()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
-	g.reject_join_request(g1.get_group_id(), SENTC.get().unwrap().get_cache())
+	g.reject_join_request(u0.get_jwt().unwrap(), g1.get_group_id())
 		.await
 		.unwrap();
 }
@@ -424,16 +481,21 @@ async fn test_23_reject_join_req()
 async fn test_24_send_join_again_and_accept()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
 
-	g1.group_join_request(g.get_group_id(), SENTC.get().unwrap().get_cache())
+	g1.group_join_request(u1.get_jwt().unwrap(), g.get_group_id())
 		.await
 		.unwrap();
 
-	g.accept_join_request(g1.get_group_id(), 2, None, SENTC.get().unwrap().get_cache())
+	let pk = u0
+		.get_group_public_key_data(g1.get_group_id())
+		.await
+		.unwrap();
+
+	g.accept_join_request(u0.get_jwt().unwrap(), &pk, g1.get_group_id(), None)
 		.await
 		.unwrap();
 }
@@ -442,16 +504,18 @@ async fn test_24_send_join_again_and_accept()
 async fn test_25_fetch_connected_group()
 {
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
 
-	let gc = g1
-		.get_connected_group(g.get_group_id(), SENTC.get().unwrap().get_cache())
+	let (data, res) = g1
+		.prepare_get_connected_group(g.get_group_id(), u1.get_jwt().unwrap())
 		.await
 		.unwrap();
-	let gc = gc.read().await;
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let gc = g1.done_get_connected_group(data).unwrap();
 
 	assert_eq!(gc.get_access_group_as_member().unwrap(), g1.get_group_id());
 }
@@ -460,17 +524,14 @@ async fn test_25_fetch_connected_group()
 async fn test_26_get_all_connected_groups()
 {
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
 
-	let list = g1
-		.get_groups(SENTC.get().unwrap().get_cache(), None)
-		.await
-		.unwrap();
+	let list = g1.get_groups(u1.get_jwt().unwrap(), None).await.unwrap();
 
 	assert_eq!(list.len(), 1);
 
 	let list_2 = g1
-		.get_groups(SENTC.get().unwrap().get_cache(), Some(list.get(0).unwrap()))
+		.get_groups(u1.get_jwt().unwrap(), Some(list.get(0).unwrap()))
 		.await
 		.unwrap();
 
@@ -480,45 +541,27 @@ async fn test_26_get_all_connected_groups()
 #[tokio::test]
 async fn zzz_clean_up()
 {
+	let u = USER_0_TEST_STATE.get().unwrap().read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
+	let u2 = USER_2_TEST_STATE.get().unwrap().read().await;
+
 	let g = CONNECTED_GROUP.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+
+	g.delete_group(u.get_jwt().unwrap()).await.unwrap();
 
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+
+	g.delete_group(u.get_jwt().unwrap()).await.unwrap();
 
 	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	g.delete_group(u1.get_jwt().unwrap()).await.unwrap();
 
 	let g = GROUP_2_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	g.delete_group(u2.get_jwt().unwrap()).await.unwrap();
 
-	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	u.delete(PW, None, None).await.unwrap();
 
-	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	u1.delete(PW, None, None).await.unwrap();
 
-	let u = USER_2_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	u2.delete(PW, None, None).await.unwrap();
 }
