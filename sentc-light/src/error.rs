@@ -5,18 +5,6 @@ pub enum SentcError
 {
 	Sdk(SdkLightError),
 
-	UserNotFound,
-	GroupNotFound,
-	KeyNotFound,
-	NoKeyFound,
-
-	ParentGroupNotFoundButRequired,
-	ParentGroupKeyNotFoundButRequired,
-	ConnectedGroupNotFoundButRequired,
-	ConnectedGroupKeyNotFoundButRequired,
-
-	NoGroupKeysFound,
-
 	TimeError,
 	JsonToStringFailed,
 	JsonParseFailed(serde_json::Error),

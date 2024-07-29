@@ -2,7 +2,7 @@
 pub mod net;
 
 use sentc_crypto_light::group::prepare_change_rank;
-use sentc_crypto_light::sdk_common::{GroupId, UserId};
+use sentc_crypto_light::sdk_common::GroupId;
 use sentc_crypto_light::sdk_utils::group::GroupOutDataLight;
 
 use crate::error::SentcError;
@@ -21,11 +21,6 @@ pub struct Group
 
 	base_url: String,
 	app_token: String,
-
-	//To know what user should be fetched from the cache.
-	// This could not be the same user as it is stored in the group cache
-	// because in the group cache the groups are stored under either the user id or connected group id
-	used_user_id: UserId,
 }
 
 impl Group
@@ -41,7 +36,6 @@ impl Group
 		joined_time: u128,
 		rank: i32,
 		is_connected_group: bool,
-		used_user_id: UserId,
 		access_by_parent: Option<GroupId>,
 		access_by_group_as_member: Option<GroupId>,
 	) -> Self
@@ -56,13 +50,12 @@ impl Group
 			joined_time,
 			rank,
 			is_connected_group,
-			used_user_id,
 			access_by_parent,
 			access_by_group_as_member,
 		}
 	}
 
-	pub fn from_server(base_url: String, app_token: String, server_data: GroupOutDataLight, actual_user_id: UserId) -> Self
+	pub fn from_server(base_url: String, app_token: String, server_data: GroupOutDataLight) -> Self
 	{
 		let parent = server_data.access_by_parent_group.is_some();
 
@@ -76,7 +69,6 @@ impl Group
 			server_data.joined_time,
 			server_data.rank,
 			server_data.is_connected_group,
-			actual_user_id,
 			server_data.access_by_parent_group,
 			server_data.access_by_group_as_member,
 		)
