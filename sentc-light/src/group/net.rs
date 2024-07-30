@@ -10,6 +10,7 @@ use sentc_crypto_light::util_req_full::group::{
 	delete_sent_join_req,
 	get_all_first_level_children,
 	get_group_light,
+	get_group_updates,
 	get_groups_for_user,
 	get_invites_for_user,
 	get_join_reqs,
@@ -108,6 +109,24 @@ impl Group
 		.await?;
 
 		Ok(group_id)
+	}
+
+	pub async fn group_update_check(&mut self, jwt: &str) -> Result<(), SentcError>
+	{
+		check_jwt(jwt)?;
+
+		let update = get_group_updates(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			&self.group_id,
+			self.access_by_group_as_member.as_deref(),
+		)
+		.await?;
+
+		self.rank = update;
+
+		Ok(())
 	}
 
 	//______________________________________________________________________________________________
