@@ -25,5 +25,9 @@ serde.workspace = true
 
 tokio = { workspace = true, optional = true }
 
+[dev-dependencies]
+tokio = { version = "1.32.0", features = ["sync", "test-util", "macros", "tokio-macros"], default-features = false }
+totp-rs = "5.0"
+
 [features]
 network = ["sentc-crypto-light/full_rustls", "tokio"]
