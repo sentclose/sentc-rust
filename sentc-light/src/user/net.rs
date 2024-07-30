@@ -420,7 +420,7 @@ impl User
 		.await?)
 	}
 
-	pub async fn get_jwt(&self) -> Result<&str, SentcError>
+	pub fn get_jwt(&self) -> Result<&str, SentcError>
 	{
 		check_jwt(&self.jwt)?;
 
