@@ -15,28 +15,25 @@ repository = "https://github.com/sentclose/sentc-rust"
 documentation = "https://sentc.com/"
 
 [workspace.dependencies]
-#sentc-crypto = {version = "0.12.0", git = "https://github.com/sentclose/sentc.git", rev="15a91d0f2241b9720f1f2f520f484c305b038be1", default-features = false, features = ["server_test"]}
-sentc-crypto = {path = "../../sdk/crypto", default-features = false, features = ["server_test"]} # for local dev
+sentc-crypto = { version = "0.14.0", default-features = false, features = ["server_test"] }
+#sentc-crypto = { git = "https://github.com/sentclose/sentc.git", rev = "b61a3483c6d75752104d00ff475824dc12358346", default-features = false, features = ["server_test"] }
+#sentc-crypto = { path = "../../sdk/crypto", default-features = false, features = ["server_test"] } # for local dev
 
-#sentc-crypto-common = {version = "0.12.0", git = "https://github.com/sentclose/sentc-common.git", rev = "15a91d0f2241b9720f1f2f520f484c305b038be1"}
-sentc-crypto-common = { path = "../../backend/sentc-api/sdk-common" }    # for local dev
+sentc-crypto-common = "0.10.0"
+#sentc-crypto-common = { git = "https://github.com/sentclose/sentc-common.git", rev = "15a91d0f2241b9720f1f2f520f484c305b038be1" }
+#sentc-crypto-common = { path = "../../backend/sentc-api/sdk-common" }    # for local dev
 
-#sentc-crypto-full = {version = "0.12.0", git = "https://github.com/sentclose/sentc.git", rev="15a91d0f2241b9720f1f2f520f484c305b038be1", features = ["rustls",  "rust"]}
-sentc-crypto-full = {path = "../../sdk/crypto_full", features = ["rustls", "rust"]} # for local dev
-
-#sentc-crypto-light = {version = "0.12.0", git = "https://github.com/sentclose/sentc.git", rev="15a91d0f2241b9720f1f2f520f484c305b038be1", default-features = false, features = ["server_test"]}
-sentc-crypto-light = {path = "../../sdk/crypto_light", default-features = false, features = ["server_test"]} # for local dev
-
-#sentc-crypto-light-full = {version = "0.12.0", git = "https://github.com/sentclose/sentc.git", rev="15a91d0f2241b9720f1f2f520f484c305b038be1", features = ["rustls",  "rust"]}
-sentc-crypto-light-full = {path = "../../sdk/crypto_light_full", features = ["rustls", "rust"]} # for local dev
+sentc-crypto-light = { version = "0.14.0", default-features = false, features = ["server_test"] }
+#sentc-crypto-light = { git = "https://github.com/sentclose/sentc.git", rev = "b61a3483c6d75752104d00ff475824dc12358346", default-features = false, features = ["server_test"] }
+#sentc-crypto-light = { path = "../../sdk/crypto_light", default-features = false, features = ["server_test"] } # for local dev
 
 # json handling
-serde_json = {version = "1.0.81", default-features = false, features = ["alloc"]}
-serde = { version = "1.0", default-features = false, features = ["derive", "alloc"]}
+serde_json = { version = "1.0.81", default-features = false, features = ["alloc"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 
-tokio = {version = "1.32.0", features = ["sync"], default-features = false}
+tokio = { version = "1.32.0", features = ["sync"], default-features = false }
 
 # workspace packages
 
-sentc = {version = "0.1.0", path = "sentc"}
-sentc-light = {version = "0.1.0", path = "sentc-light"}
+sentc = { version = "0.1.0", path = "sentc" }
+sentc-light = { version = "0.1.0", path = "sentc-light" }
