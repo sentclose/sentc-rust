@@ -1,22 +1,49 @@
-#[cfg(feature = "network")]
-pub mod crypto_net;
 pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
 
-use sentc_crypto::entities::keys::{HmacKey, PublicKey, SecretKey, SignKey, SymmetricKey, VerifyKey};
+use std::marker::PhantomData;
+
 use sentc_crypto::entities::user::{UserDataInt, UserKeyDataInt};
-use sentc_crypto::group::prepare_create;
+use sentc_crypto::group::Group as SdkGroup;
 use sentc_crypto::sdk_common::group::GroupHmacData;
 use sentc_crypto::sdk_common::user::{UserPublicKeyData, UserVerifyKeyData};
 use sentc_crypto::sdk_common::{DeviceId, SymKeyId, UserId};
-use sentc_crypto::user::{create_safety_number, prepare_register_device};
+use sentc_crypto::sdk_core::cryptomat::{PwHash, SearchableKeyGen, SortableKeyGen};
+use sentc_crypto::sdk_utils::cryptomat::{
+	PkFromUserKeyWrapper,
+	SearchableKeyComposerWrapper,
+	SignComposerWrapper,
+	SignKeyPairWrapper,
+	SortableKeyComposerWrapper,
+	StaticKeyComposerWrapper,
+	StaticKeyPairWrapper,
+	SymKeyComposerWrapper,
+	SymKeyGenWrapper,
+	SymKeyWrapper,
+	VerifyKFromUserKeyWrapper,
+};
+use sentc_crypto::user::{generate_user_register_data, User as SdkUser};
 
 use crate::error::SentcError;
 use crate::group::prepare_group_keys_ref;
-use crate::{decrypt_hmac_key, KeyMap};
+use crate::KeyMap;
 
-pub struct User
+pub struct User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+where
+	SGen: SymKeyGenWrapper,
+	StGen: StaticKeyPairWrapper,
+	SignGen: SignKeyPairWrapper,
+	SearchGen: SearchableKeyGen,
+	SortGen: SortableKeyGen,
+	SC: SymKeyComposerWrapper,
+	StC: StaticKeyComposerWrapper,
+	SignC: SignComposerWrapper,
+	SearchC: SearchableKeyComposerWrapper,
+	SortC: SortableKeyComposerWrapper,
+	PC: PkFromUserKeyWrapper,
+	VC: VerifyKFromUserKeyWrapper,
+	PwH: PwHash,
 {
 	user_id: UserId,
 	user_identifier: String,
@@ -28,30 +55,61 @@ pub struct User
 	mfa: bool,
 
 	//device keys
-	private_device_key: SecretKey,
-	public_device_key: PublicKey,
-	sign_device_key: SignKey,
-	verify_device_key: VerifyKey,
+	private_device_key: StC::SkWrapper,
+	public_device_key: StC::PkWrapper,
+	sign_device_key: SignC::SignKWrapper,
+	verify_device_key: SignC::VerifyKWrapper,
 	exported_verify_device_key: UserVerifyKeyData,
 	exported_public_device_key: UserPublicKeyData,
 
 	//user keys
-	user_keys: Vec<UserKeyDataInt>,
+	#[allow(clippy::type_complexity)]
+	user_keys: Vec<UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>>,
 	key_map: KeyMap,
 	newest_key_id: SymKeyId,
-	hmac_keys: Vec<HmacKey>,
+	hmac_keys: Vec<SearchC::SearchableKeyWrapper>,
 
 	base_url: String,
 	app_token: String,
+
+	_sgen: PhantomData<SGen>,
+	_st_gen: PhantomData<StGen>,
+	_sign_gen: PhantomData<SignGen>,
+	_search_gen: PhantomData<SearchGen>,
+	_sort_gen: PhantomData<SortGen>,
+	_sc: PhantomData<SC>,
+	_st_c: PhantomData<StC>,
+	_sign_c: PhantomData<SignC>,
+	_search_c: PhantomData<SearchC>,
+	_sort_c: PhantomData<SortC>,
+	_pc: PhantomData<PC>,
+	_vc: PhantomData<VC>,
+	_pw: PhantomData<PwH>,
 }
 
-impl User
+impl<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+	User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+where
+	SGen: SymKeyGenWrapper,
+	StGen: StaticKeyPairWrapper,
+	SignGen: SignKeyPairWrapper,
+	SearchGen: SearchableKeyGen,
+	SortGen: SortableKeyGen,
+	SC: SymKeyComposerWrapper,
+	StC: StaticKeyComposerWrapper,
+	SignC: SignComposerWrapper,
+	SearchC: SearchableKeyComposerWrapper,
+	SortC: SortableKeyComposerWrapper,
+	PC: PkFromUserKeyWrapper,
+	VC: VerifyKFromUserKeyWrapper,
+	PwH: PwHash,
 {
+	#[allow(clippy::type_complexity)]
 	fn new_user(
 		base_url: String,
 		app_token: String,
 		user_identifier: String,
-		data: UserDataInt,
+		data: UserDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>,
 		mfa: bool,
 	) -> Result<(Self, Vec<GroupHmacData>), SentcError>
 	{
@@ -60,13 +118,13 @@ impl User
 			.first()
 			.ok_or(SentcError::KeyNotFound)?
 			.group_key
-			.key_id
-			.clone();
+			.get_id()
+			.to_string();
 
 		let mut key_map: KeyMap = Default::default();
 
 		for (i, key) in data.user_keys.iter().enumerate() {
-			key_map.insert(key.group_key.key_id.clone(), i);
+			key_map.insert(key.group_key.get_id().to_string(), i);
 		}
 
 		Ok((
@@ -89,6 +147,20 @@ impl User
 				hmac_keys: Vec::with_capacity(data.hmac_keys.len()),
 				base_url,
 				app_token,
+
+				_sgen: Default::default(),
+				_st_gen: Default::default(),
+				_sign_gen: Default::default(),
+				_search_gen: Default::default(),
+				_sort_gen: Default::default(),
+				_sc: Default::default(),
+				_st_c: Default::default(),
+				_sign_c: Default::default(),
+				_search_c: Default::default(),
+				_sort_c: Default::default(),
+				_pc: Default::default(),
+				_vc: Default::default(),
+				_pw: Default::default(),
 			},
 			data.hmac_keys,
 		))
@@ -96,7 +168,13 @@ impl User
 
 	#[cfg(not(feature = "network"))]
 	#[allow(clippy::too_many_arguments)]
-	pub fn new(base_url: String, app_token: String, user_identifier: String, data: UserDataInt, mfa: bool) -> Result<Self, SentcError>
+	pub fn new(
+		base_url: String,
+		app_token: String,
+		user_identifier: String,
+		data: UserDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>,
+		mfa: bool,
+	) -> Result<Self, SentcError>
 	{
 		let (mut u, hmac_keys) = Self::new_user(base_url, app_token, user_identifier, data, mfa)?;
 
@@ -130,19 +208,27 @@ impl User
 		&self.refresh_token
 	}
 
-	pub fn get_newest_key(&self) -> Option<&UserKeyDataInt>
+	#[allow(clippy::type_complexity)]
+	pub fn get_newest_key(
+		&self,
+	) -> Option<&UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>>
 	{
 		let index = self.key_map.get(&self.newest_key_id).unwrap_or(&0);
 
 		self.user_keys.get(*index)
 	}
 
-	pub fn get_newest_public_key(&self) -> Option<&PublicKey>
+	pub fn get_newest_public_key(&self) -> Option<&StC::PkWrapper>
 	{
 		self.get_newest_key().map(|k| &k.public_key)
 	}
 
-	pub fn get_newest_sign_key(&self) -> Option<&SignKey>
+	pub fn get_newest_exported_public_key(&self) -> Option<&UserPublicKeyData>
+	{
+		self.get_newest_key().map(|k| &k.exported_public_key)
+	}
+
+	pub fn get_newest_sign_key(&self) -> Option<&SignC::SignKWrapper>
 	{
 		self.get_newest_key().map(|k| &k.sign_key)
 	}
@@ -157,11 +243,20 @@ impl User
 		self.refresh_token = refresh_token;
 	}
 
-	pub fn get_user_keys(&self, key_id: &str) -> Option<&UserKeyDataInt>
+	#[allow(clippy::type_complexity)]
+	pub fn get_user_keys(
+		&self,
+		key_id: &str,
+	) -> Option<&UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>>
 	{
 		self.key_map
 			.get(key_id)
 			.and_then(|k| self.user_keys.get(*k))
+	}
+
+	pub fn has_user_keys(&self, key_id: &str) -> Option<&usize>
+	{
+		self.key_map.get(key_id)
 	}
 
 	pub fn prepare_register_device_keys(&self, sever_output: &str) -> Result<(String, UserPublicKeyData), SentcError>
@@ -170,7 +265,21 @@ impl User
 
 		let key_session = self.user_keys.len() > 50;
 
-		Ok(prepare_register_device(sever_output, &keys, key_session)?)
+		Ok(SdkUser::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+			PwH,
+		>::prepare_register_device(sever_output, &keys, key_session)?)
 	}
 
 	pub fn get_mfa(&self) -> bool
@@ -178,22 +287,22 @@ impl User
 		self.mfa
 	}
 
-	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymmetricKey>, bool)
+	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SC::SymmetricKeyWrapper>, bool)
 	{
 		prepare_group_keys_ref!(self.user_keys, page, 50)
 	}
 
-	pub fn get_private_device_key(&self) -> &SecretKey
+	pub fn get_private_device_key(&self) -> &StC::SkWrapper
 	{
 		&self.private_device_key
 	}
 
-	pub fn get_public_device_key(&self) -> &PublicKey
+	pub fn get_public_device_key(&self) -> &StC::PkWrapper
 	{
 		&self.public_device_key
 	}
 
-	pub fn get_verify_device_key(&self) -> &VerifyKey
+	pub fn get_verify_device_key(&self) -> &SignC::VerifyKWrapper
 	{
 		&self.verify_device_key
 	}
@@ -216,22 +325,52 @@ impl User
 				.get_user_keys(&hmac_key.encrypted_hmac_encryption_key_id)
 				.ok_or(SentcError::KeyNotFound)?;
 
-			decrypt_hmac_key!(&key.group_key, self, hmac_key);
+			let decrypted_hmac_key =
+				SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_hmac_key(
+					&key.group_key,
+					hmac_key,
+				)?;
+
+			self.hmac_keys.push(decrypted_hmac_key);
 		}
 
 		Ok(())
 	}
 
-	pub fn set_hmac_key(&mut self, user_key: &UserKeyDataInt, hmac_key: GroupHmacData) -> Result<(), SentcError>
+	#[allow(clippy::type_complexity)]
+	pub fn set_hmac_key(
+		&mut self,
+		user_key: &UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>,
+		hmac_key: GroupHmacData,
+	) -> Result<(), SentcError>
 	{
-		decrypt_hmac_key!(&user_key.group_key, self, hmac_key);
+		let decrypted_hmac_key =
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_hmac_key(
+				&user_key.group_key,
+				hmac_key,
+			)?;
+
+		self.hmac_keys.push(decrypted_hmac_key);
 
 		Ok(())
 	}
 
 	pub fn prepare_create_group(&self) -> Result<String, SentcError>
 	{
-		Ok(prepare_create(
+		Ok(SdkGroup::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+		>::prepare_create(
 			self.get_newest_public_key()
 				.ok_or(SentcError::KeyNotFound)?,
 		)?)
@@ -239,7 +378,21 @@ impl User
 
 	pub fn create_safety_number_sync(&self, other_user: Option<&str>, other_user_key: Option<&UserVerifyKeyData>) -> Result<String, SentcError>
 	{
-		Ok(create_safety_number(
+		Ok(SdkUser::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+			PwH,
+		>::create_safety_number(
 			&self
 				.get_newest_key()
 				.ok_or(SentcError::KeyNotFound)?
@@ -255,11 +408,78 @@ impl User
 		self.newest_key_id = id;
 	}
 
-	fn extend_user_key(&mut self, user_keys: UserKeyDataInt)
+	#[allow(clippy::type_complexity)]
+	fn extend_user_key(
+		&mut self,
+		user_keys: UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>,
+	)
 	{
 		//keys are already decrypted from the sentc full sdk and the private device key
 		self.key_map
-			.insert(user_keys.group_key.key_id.clone(), self.user_keys.len());
+			.insert(user_keys.group_key.get_id().to_string(), self.user_keys.len());
 		self.user_keys.push(user_keys);
 	}
+
+	//==============================================================================================
+
+	pub fn prepare_register(user_identifier: &str, password: &str) -> Result<String, SentcError>
+	{
+		if user_identifier.is_empty() || password.is_empty() {
+			return Err(SentcError::UsernameOrPasswordRequired);
+		}
+
+		Ok(SdkUser::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+			PwH,
+		>::register(user_identifier, password)?)
+	}
+
+	pub fn prepare_register_device_start(device_identifier: &str, password: &str) -> Result<String, SentcError>
+	{
+		if device_identifier.is_empty() || password.is_empty() {
+			return Err(SentcError::UsernameOrPasswordRequired);
+		}
+
+		Ok(SdkUser::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+			PwH,
+		>::prepare_register_device_start(device_identifier, password)?)
+	}
+}
+
+pub fn generate_register_data() -> Result<(String, String), SentcError>
+{
+	Ok(generate_user_register_data()?)
+}
+
+pub fn done_register(server_output: &str) -> Result<UserId, SentcError>
+{
+	Ok(sentc_crypto::user::done_register(server_output)?)
+}
+
+pub fn done_register_device_start(server_output: &str) -> Result<(), SentcError>
+{
+	Ok(sentc_crypto::user::done_register_device_start(server_output)?)
 }

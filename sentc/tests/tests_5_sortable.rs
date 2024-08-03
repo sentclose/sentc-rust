@@ -1,16 +1,24 @@
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use std::ops::Deref;
-use std::sync::Arc;
 
-use sentc::group::Group;
-use sentc::sentc::Sentc;
-use sentc::user::User;
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
+use sentc::group::net::GroupFetchResult;
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 use tokio::sync::{OnceCell, RwLock};
 
-struct UserState(Arc<RwLock<User>>);
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
+use crate::test_mod::{TestGroup, TestUser};
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
+mod test_mod;
+
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
+struct UserState(TestUser);
+
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 impl Deref for UserState
 {
-	type Target = Arc<RwLock<User>>;
+	type Target = TestUser;
 
 	fn deref(&self) -> &Self::Target
 	{
@@ -18,11 +26,13 @@ impl Deref for UserState
 	}
 }
 
-struct GroupState(Arc<RwLock<Group>>);
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
+struct GroupState(TestGroup);
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 impl Deref for GroupState
 {
-	type Target = Arc<RwLock<Group>>;
+	type Target = TestGroup;
 
 	fn deref(&self) -> &Self::Target
 	{
@@ -30,79 +40,98 @@ impl Deref for GroupState
 	}
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static USER_0_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static USER_1_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static GROUP_0_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 static GROUP_1_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 
-static SENTC: OnceCell<Sentc> = OnceCell::const_new();
-
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const USERNAME0: &str = "test0";
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const USERNAME1: &str = "test1";
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 const PW: &str = "12345";
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn aaa_init_global_test()
 {
-	let sentc = Sentc::init(
-		"http://127.0.0.1:3002",
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
 		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
-		None,
-		None,
+		USERNAME0,
+		PW,
 	)
-	.await;
-
-	sentc.register(USERNAME0, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME0, PW).await.unwrap();
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME0,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	USER_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
 
-	sentc.register(USERNAME1, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME1, PW).await.unwrap();
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
 	USER_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
-
-	SENTC.get_or_init(|| async move { sentc }).await;
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_10_create_and_fetch_group()
 {
-	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = uw
-		.create_group(SENTC.get().unwrap().get_cache())
+	let group_id = u0.create_group().await.unwrap();
+
+	let (data, res) = u0.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u0.done_get_group(data, None).unwrap();
+
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
+
+	let pk = u0.get_user_public_key_data(u1.get_user_id()).await.unwrap();
+
+	group
+		.invite_auto(u0.get_jwt().unwrap(), u1.get_user_id(), &pk, None)
 		.await
 		.unwrap();
 
-	let group = uw
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let (data, res) = u1.prepare_get_group(&group_id, None).await.unwrap();
 
-	drop(uw);
+	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let g = group.read().await;
-
-	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let mut ur = u.write().await;
-
-	g.invite_auto(ur.get_user_id(), None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
-
-	drop(g);
-
-	let group1 = ur
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let group1 = u1.done_get_group(data, None).unwrap();
 
 	GROUP_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -113,14 +142,13 @@ async fn test_10_create_and_fetch_group()
 		.await;
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_11_encrypt_number()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
 	let a = g.encrypt_sortable_raw_number(262).unwrap();
 	let b = g.encrypt_sortable_raw_number(263).unwrap();
@@ -143,14 +171,13 @@ async fn test_11_encrypt_number()
 	assert_eq!(c, c1);
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn test_12_encrypt_string()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let g = g.read().await;
 
 	let g1 = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let g1 = g1.read().await;
 
 	const STR_VALUES: [&str; 10] = ["a", "az", "azzz", "b", "ba", "baaa", "o", "oe", "z", "zaaa"];
 
@@ -190,24 +217,17 @@ async fn test_12_encrypt_string()
 	}
 }
 
+#[cfg(all(test, any(feature = "std_keys", feature = "rec_keys")))]
 #[tokio::test]
 async fn zzz_clean_up()
 {
-	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
-	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	g.delete_group(u0.get_jwt().unwrap()).await.unwrap();
+
+	u0.delete(PW, None, None).await.unwrap();
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	u.delete(PW, None, None).await.unwrap();
 }

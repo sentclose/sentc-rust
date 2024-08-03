@@ -1,16 +1,17 @@
 use std::ops::Deref;
-use std::sync::Arc;
 
-use sentc::group::Group;
-use sentc::sentc::Sentc;
-use sentc::user::User;
+use sentc::group::net::GroupFetchResult;
 use tokio::sync::{OnceCell, RwLock};
 
-struct UserState(Arc<RwLock<User>>);
+use crate::test_mod::{TestGroup, TestUser};
+
+mod test_mod;
+
+struct UserState(TestUser);
 
 impl Deref for UserState
 {
-	type Target = Arc<RwLock<User>>;
+	type Target = TestUser;
 
 	fn deref(&self) -> &Self::Target
 	{
@@ -18,11 +19,11 @@ impl Deref for UserState
 	}
 }
 
-struct GroupState(Arc<RwLock<Group>>);
+struct GroupState(TestGroup);
 
 impl Deref for GroupState
 {
-	type Target = Arc<RwLock<Group>>;
+	type Target = TestGroup;
 
 	fn deref(&self) -> &Self::Target
 	{
@@ -35,8 +36,6 @@ static USER_1_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
 
 static GROUP_0_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
 static GROUP_1_TEST_STATE: OnceCell<RwLock<GroupState>> = OnceCell::const_new();
-
-static SENTC: OnceCell<Sentc> = OnceCell::const_new();
 
 static SEARCH_STR: OnceCell<Vec<String>> = OnceCell::const_new();
 static SEARCH_FULL_STR: OnceCell<Vec<String>> = OnceCell::const_new();
@@ -51,63 +50,74 @@ const STR: &str = "123*+^êéèüöß@€&$ 👍 🚀 😎";
 #[tokio::test]
 async fn aaa_init_global_test()
 {
-	let sentc = Sentc::init(
-		"http://127.0.0.1:3002",
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
 		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
-		None,
-		None,
+		USERNAME0,
+		PW,
 	)
-	.await;
-
-	sentc.register(USERNAME0, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME0, PW).await.unwrap();
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME0,
+		PW,
+	)
+	.await
+	.unwrap();
 
 	USER_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
 
-	sentc.register(USERNAME1, PW).await.unwrap();
-	let user = sentc.login_forced(USERNAME1, PW).await.unwrap();
+	TestUser::register(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME1,
+		PW,
+	)
+	.await
+	.unwrap();
 	USER_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(UserState(user)) })
 		.await;
-
-	SENTC.get_or_init(|| async move { sentc }).await;
 }
 
 #[tokio::test]
 async fn test_10_create_and_fetch_group()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let mut uw = u.write().await;
 
-	let group_id = uw
-		.create_group(SENTC.get().unwrap().get_cache())
+	let group_id = u.create_group().await.unwrap();
+
+	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, None).unwrap();
+
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
+
+	let pk = u.get_user_public_key_data(u1.get_user_id()).await.unwrap();
+
+	group
+		.invite_auto(u.get_jwt().unwrap(), u1.get_user_id(), &pk, None)
 		.await
 		.unwrap();
 
-	let group = uw
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	let (data, res) = u1.prepare_get_group(&group_id, None).await.unwrap();
 
-	drop(uw);
-
-	let g = group.read().await;
-
-	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let mut ur = u.write().await;
-
-	g.invite_auto(ur.get_user_id(), None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
-
-	drop(g);
-
-	let group1 = ur
-		.get_group(&group_id, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+	assert!(matches!(res, GroupFetchResult::Ok));
+	let group1 = u1.done_get_group(data, None).unwrap();
 
 	GROUP_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -122,9 +132,8 @@ async fn test_10_create_and_fetch_group()
 async fn test_11_create_full_search()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
 
-	let str = gr.create_search_raw(STR, true, None).unwrap();
+	let str = g.create_search_raw(STR, true, None).unwrap();
 
 	assert_eq!(str.len(), 1);
 
@@ -135,9 +144,8 @@ async fn test_11_create_full_search()
 async fn test_12_create_search()
 {
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
 
-	let str = gr.create_search_raw(STR, false, None).unwrap();
+	let str = g.create_search_raw(STR, false, None).unwrap();
 
 	assert_eq!(str.len(), 39);
 
@@ -148,12 +156,11 @@ async fn test_12_create_search()
 async fn test_13_search_item()
 {
 	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
 
 	let str = SEARCH_STR.get().unwrap();
 	let str_full = SEARCH_FULL_STR.get().unwrap();
 
-	let str_item = gr.search(STR).unwrap();
+	let str_item = g.search(STR).unwrap();
 
 	assert_eq!(*str_full.get(0).unwrap(), str_item);
 	assert!(str.contains(&str_item));
@@ -163,11 +170,10 @@ async fn test_13_search_item()
 async fn test_14_search_item_in_parts()
 {
 	let g = GROUP_1_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
 
 	let str = SEARCH_STR.get().unwrap();
 
-	let str_item = gr.search("123").unwrap();
+	let str_item = g.search("123").unwrap();
 
 	assert!(str.contains(&str_item));
 }
@@ -175,21 +181,15 @@ async fn test_14_search_item_in_parts()
 #[tokio::test]
 async fn zzz_clean_up()
 {
-	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
-	let gr = g.read().await;
-	gr.delete_group(SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
-
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+
+	g.delete_group(u.get_jwt().unwrap()).await.unwrap();
+
+	u.delete(PW, None, None).await.unwrap();
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
-	let ur = u.read().await;
-	ur.delete(PW, None, None, SENTC.get().unwrap().get_cache())
-		.await
-		.unwrap();
+
+	u.delete(PW, None, None).await.unwrap();
 }

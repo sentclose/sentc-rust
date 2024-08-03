@@ -1,16 +1,34 @@
-use sentc::error::SentcError;
+use std::ops::{Deref, DerefMut};
+
+use sentc_light::error::SentcError;
+use sentc_light::user::net::{login, login_forced, mfa_login, mfa_recovery_login, register, UserLoginReturn};
+use sentc_light::user::User;
 use tokio::sync::{OnceCell, RwLock};
 use totp_rs::{Algorithm, Secret, TOTP};
 
-use crate::test_mod::{TestUser, TestUserLoginReturn};
-
-mod test_mod;
-
 struct UserState
 {
-	inner: TestUser,
+	inner: User,
 	otp_sec: String,
 	recovery: Vec<String>,
+}
+
+impl Deref for UserState
+{
+	type Target = User;
+
+	fn deref(&self) -> &Self::Target
+	{
+		&self.inner
+	}
+}
+
+impl DerefMut for UserState
+{
+	fn deref_mut(&mut self) -> &mut Self::Target
+	{
+		&mut self.inner
+	}
 }
 
 static USER_TEST_STATE: OnceCell<RwLock<UserState>> = OnceCell::const_new();
@@ -26,7 +44,7 @@ fn get_totp(sec: String) -> TOTP
 #[tokio::test]
 async fn aaa_init_global_test()
 {
-	TestUser::register(
+	register(
 		"http://127.0.0.1:3002".into(),
 		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
 		USERNAME,
@@ -35,9 +53,9 @@ async fn aaa_init_global_test()
 	.await
 	.unwrap();
 
-	let user = TestUser::login_forced(
+	let user = login_forced(
 		"http://127.0.0.1:3002".into(),
-		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 		USERNAME,
 		PW,
 	)
@@ -63,7 +81,7 @@ async fn test_10_register_otp()
 {
 	let mut u = USER_TEST_STATE.get().unwrap().write().await;
 
-	let out = u.inner.register_raw_otp(PW, None, None).await.unwrap();
+	let out = u.register_raw_otp(PW, None, None).await.unwrap();
 
 	u.otp_sec = out.secret;
 	u.recovery = out.recover;
@@ -72,9 +90,9 @@ async fn test_10_register_otp()
 #[tokio::test]
 async fn test_11_not_login_without_otp()
 {
-	let err = TestUser::login_forced(
+	let err = login_forced(
 		"http://127.0.0.1:3002".into(),
-		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 		USERNAME,
 		PW,
 	)
@@ -89,9 +107,9 @@ async fn test_11_not_login_without_otp()
 #[tokio::test]
 async fn test_12_login_with_otp()
 {
-	let u = TestUser::login(
+	let u = login(
 		"http://127.0.0.1:3002".into(),
-		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 		USERNAME,
 		PW,
 	)
@@ -99,18 +117,18 @@ async fn test_12_login_with_otp()
 	.unwrap();
 
 	match u {
-		TestUserLoginReturn::Direct(_) => {
+		UserLoginReturn::Direct(_) => {
 			panic!("should not be direct login")
 		},
-		TestUserLoginReturn::Otp(d) => {
+		UserLoginReturn::Otp(d) => {
 			let u = USER_TEST_STATE.get().unwrap().read().await;
 			//create a token
 			let totp = get_totp(u.otp_sec.clone());
 			let token = totp.generate_current().unwrap();
 
-			let user = TestUser::mfa_login(
+			let user = mfa_login(
 				"http://127.0.0.1:3002".into(),
-				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 				token,
 				USERNAME,
 				d,
@@ -143,9 +161,9 @@ async fn test_13_get_all_recover_keys()
 #[tokio::test]
 async fn test_14_login_with_recovery_key()
 {
-	let u = TestUser::login(
+	let u = login(
 		"http://127.0.0.1:3002".into(),
-		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 		USERNAME,
 		PW,
 	)
@@ -153,15 +171,15 @@ async fn test_14_login_with_recovery_key()
 	.unwrap();
 
 	match u {
-		TestUserLoginReturn::Direct(_) => {
+		UserLoginReturn::Direct(_) => {
 			panic!("should not be direct login")
 		},
-		TestUserLoginReturn::Otp(d) => {
+		UserLoginReturn::Otp(d) => {
 			let u = USER_TEST_STATE.get().unwrap().read().await;
 
-			let user = TestUser::mfa_recovery_login(
+			let user = mfa_recovery_login(
 				"http://127.0.0.1:3002".into(),
-				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+				"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 				u.recovery[0].clone(),
 				USERNAME,
 				d,
@@ -243,9 +261,9 @@ async fn test_30_disable_otp()
 #[tokio::test]
 async fn test_31_login_without_otp()
 {
-	let u = TestUser::login(
+	let u = login(
 		"http://127.0.0.1:3002".into(),
-		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi".into(),
 		USERNAME,
 		PW,
 	)
@@ -253,8 +271,8 @@ async fn test_31_login_without_otp()
 	.unwrap();
 
 	match u {
-		TestUserLoginReturn::Direct(_) => {},
-		TestUserLoginReturn::Otp(_) => {
+		UserLoginReturn::Direct(_) => {},
+		UserLoginReturn::Otp(_) => {
 			panic!("should not be otp login")
 		},
 	}

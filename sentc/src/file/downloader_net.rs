@@ -1,75 +1,89 @@
+use std::marker::PhantomData;
 use std::path::{Path, MAIN_SEPARATOR_STR};
 
-use sentc_crypto::entities::keys::SymmetricKey;
+use sentc_crypto::file::FileEncryptor as SdkFileEncryptor;
 use sentc_crypto::sdk_common::file::{FileData, FilePartListItem};
 use sentc_crypto::sdk_common::user::UserVerifyKeyData;
-use sentc_crypto_full::file::{download_and_decrypt_file_part, download_and_decrypt_file_part_start, download_file_meta, download_part_list};
+use sentc_crypto::sdk_core::cryptomat::{SymKeyComposer, SymKeyGen};
+use sentc_crypto::sdk_utils::cryptomat::{SignKWrapper, SymKeyWrapper, VerifyKFromUserKeyWrapper};
+use sentc_crypto::util_req_full::file::{download_file_meta, download_part_list};
 use tokio::fs::{metadata, File};
 use tokio::io::AsyncWriteExt;
 
 use crate::error::SentcError;
 
-#[allow(clippy::too_many_arguments)]
-#[inline(always)]
-pub(crate) async fn download_parts(
-	mut file: File,
-	base_url: &str,
-	app_token: &str,
-	url_prefix: Option<String>,
-	contend_key: &SymmetricKey,
-	part_list: &[FilePartListItem],
-	upload_callback: Option<impl Fn(u32)>,
-	verify_key: Option<&UserVerifyKeyData>,
-) -> Result<(), SentcError>
+pub struct FileEncryptorDownload<S, SC, SignK, VC>
 {
-	//default key -> will be set after the first chunk was processed.
-	let mut next_file_key = None;
+	_s: PhantomData<S>,
+	_sc: PhantomData<SC>,
+	_sign_k: PhantomData<SignK>,
+	_vc: PhantomData<VC>,
+}
 
-	for (i, part) in part_list.iter().enumerate() {
-		let external = part.extern_storage;
+impl<S: SymKeyGen, SC: SymKeyComposer, SignK: SignKWrapper, VC: VerifyKFromUserKeyWrapper> FileEncryptorDownload<S, SC, SignK, VC>
+{
+	#[allow(clippy::too_many_arguments)]
+	#[inline(always)]
+	pub(crate) async fn download_parts(
+		mut file: File,
+		base_url: &str,
+		app_token: &str,
+		url_prefix: Option<String>,
+		contend_key: &impl SymKeyWrapper,
+		part_list: &[FilePartListItem],
+		upload_callback: Option<impl Fn(u32)>,
+		verify_key: Option<&UserVerifyKeyData>,
+	) -> Result<(), SentcError>
+	{
+		//default key -> will be set after the first chunk was processed.
+		let mut next_file_key = None;
 
-		let part_url_base = if external { url_prefix.clone() } else { None };
+		for (i, part) in part_list.iter().enumerate() {
+			let external = part.extern_storage;
 
-		let part = if i == 0 {
-			let (decrypted_part, next_key) = download_and_decrypt_file_part_start(
-				base_url.to_string(),
-				part_url_base,
-				app_token,
-				&part.part_id,
-				contend_key,
-				verify_key,
-			)
-			.await?;
+			let part_url_base = if external { url_prefix.clone() } else { None };
 
-			next_file_key = Some(next_key);
-			decrypted_part
-		} else {
-			let (decrypted_part, next_key) = download_and_decrypt_file_part(
-				base_url.to_string(),
-				part_url_base,
-				app_token,
-				&part.part_id,
-				&next_file_key.unwrap(),
-				verify_key,
-			)
-			.await?;
+			let part = if i == 0 {
+				let (decrypted_part, next_key) = SdkFileEncryptor::<S, SC, SignK, VC>::download_and_decrypt_file_part_start(
+					base_url.to_string(),
+					part_url_base,
+					app_token,
+					&part.part_id,
+					contend_key,
+					verify_key,
+				)
+				.await?;
 
-			next_file_key = Some(next_key);
-			decrypted_part
-		};
+				next_file_key = Some(next_key);
+				decrypted_part
+			} else {
+				let (decrypted_part, next_key) = SdkFileEncryptor::<S, SC, SignK, VC>::download_and_decrypt_file_part(
+					base_url.to_string(),
+					part_url_base,
+					app_token,
+					&part.part_id,
+					&next_file_key.unwrap(),
+					verify_key,
+				)
+				.await?;
 
-		file.write_all(&part)
-			.await
-			.map_err(SentcError::FileReadError)?;
+				next_file_key = Some(next_key);
+				decrypted_part
+			};
 
-		if let Some(cb) = &upload_callback {
-			cb(((i + 1) / part_list.len()) as u32);
+			file.write_all(&part)
+				.await
+				.map_err(SentcError::FileReadError)?;
+
+			if let Some(cb) = &upload_callback {
+				cb(((i + 1) / part_list.len()) as u32);
+			}
 		}
+
+		file.shutdown().await.map_err(SentcError::FileReadError)?;
+
+		Ok(())
 	}
-
-	file.shutdown().await.map_err(SentcError::FileReadError)?;
-
-	Ok(())
 }
 
 pub(crate) async fn download_file_meta_information(

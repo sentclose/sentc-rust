@@ -9,12 +9,9 @@ pub enum SentcError
 	UserNotFound,
 	GroupNotFound,
 	KeyNotFound,
-	NoKeyFound,
+	KeyRequired(String),
 
-	ParentGroupNotFoundButRequired,
-	ParentGroupKeyNotFoundButRequired,
-	ConnectedGroupNotFoundButRequired,
-	ConnectedGroupKeyNotFoundButRequired,
+	ParentGroupKeyNotFoundButRequired(String),
 
 	NoGroupKeysFound,
 
@@ -29,6 +26,11 @@ pub enum SentcError
 	FileReadError(std::io::Error),
 	#[cfg(feature = "file")]
 	FilePartNotFound,
+
+	JwtExpired,
+
+	GroupFetchUserKeyNotFound,
+	GroupFetchGroupKeyNotFound(String),
 }
 
 impl From<SdkError> for SentcError

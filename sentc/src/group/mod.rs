@@ -1,23 +1,38 @@
-#[cfg(feature = "network")]
-pub mod crypto_net;
 pub mod crypto_sync;
 #[cfg(feature = "file")]
 pub mod file;
 #[cfg(feature = "network")]
 pub mod net;
 
+use std::marker::PhantomData;
+
 use sentc_crypto::entities::group::GroupKeyData;
-use sentc_crypto::entities::keys::{HmacKey, SecretKey, SortableKey, SymmetricKey};
-use sentc_crypto::group::{decrypt_group_keys, prepare_change_rank, prepare_group_keys_for_new_member};
+use sentc_crypto::group::{prepare_change_rank, Group as SdkGroup};
 use sentc_crypto::sdk_common::content_searchable::SearchableCreateOutput;
 use sentc_crypto::sdk_common::content_sortable::SortableEncryptOutput;
 use sentc_crypto::sdk_common::group::{GroupHmacData, GroupKeyServerOutput, GroupSortableData};
 use sentc_crypto::sdk_common::user::UserPublicKeyData;
-use sentc_crypto::sdk_common::{GroupId, SymKeyId, UserId};
-use sentc_crypto::sdk_core::cryptomat::SortableKey as CoreSort;
+use sentc_crypto::sdk_common::{GroupId, SymKeyId};
+use sentc_crypto::sdk_core::cryptomat::{PwHash, SearchableKeyGen, SortableKey as CoreSort, SortableKeyGen};
+use sentc_crypto::sdk_utils::cryptomat::{
+	PkFromUserKeyWrapper,
+	SearchableKeyComposerWrapper,
+	SearchableKeyWrapper,
+	SignComposerWrapper,
+	SignKeyPairWrapper,
+	SkWrapper,
+	SortableKeyComposerWrapper,
+	SortableKeyWrapper,
+	StaticKeyComposerWrapper,
+	StaticKeyPairWrapper,
+	SymKeyComposerWrapper,
+	SymKeyGenWrapper,
+	SymKeyWrapper,
+	VerifyKFromUserKeyWrapper,
+};
 
 use crate::error::SentcError;
-use crate::{decrypt_hmac_key, decrypt_sort_key, KeyMap};
+use crate::KeyMap;
 
 macro_rules! prepare_group_keys_ref {
 	($keys:expr, $page:expr, $max:expr) => {{
@@ -32,10 +47,7 @@ macro_rules! prepare_group_keys_ref {
 		let end = if end > $keys.len() { $keys.len() } else { end };
 
 		(
-			$keys[offset..end]
-				.iter()
-				.map(|k| &k.group_key)
-				.collect::<Vec<&sentc_crypto::entities::keys::SymmetricKey>>(),
+			$keys[offset..end].iter().map(|k| &k.group_key).collect(),
 			end < $keys.len() - 1,
 		)
 	}};
@@ -43,14 +55,28 @@ macro_rules! prepare_group_keys_ref {
 
 pub(crate) use prepare_group_keys_ref;
 
-pub type GroupFromServerReturn = (
-	Group,
+pub type GroupFromServerReturn<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH> = (
+	Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>,
 	Vec<GroupKeyServerOutput>,
 	Vec<GroupHmacData>,
 	Vec<GroupSortableData>,
 );
 
-pub struct Group
+pub struct Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+where
+	SGen: SymKeyGenWrapper,
+	StGen: StaticKeyPairWrapper,
+	SignGen: SignKeyPairWrapper,
+	SearchGen: SearchableKeyGen,
+	SortGen: SortableKeyGen,
+	SC: SymKeyComposerWrapper,
+	StC: StaticKeyComposerWrapper,
+	SignC: SignComposerWrapper,
+	SearchC: SearchableKeyComposerWrapper,
+	SortC: SortableKeyComposerWrapper,
+	PC: PkFromUserKeyWrapper,
+	VC: VerifyKFromUserKeyWrapper,
+	PwH: PwHash,
 {
 	group_id: GroupId,
 	parent_group_id: Option<GroupId>,
@@ -63,22 +89,46 @@ pub struct Group
 	access_by_parent: Option<GroupId>,
 	access_by_group_as_member: Option<GroupId>,
 
-	keys: Vec<GroupKeyData>,
-	hmac_keys: Vec<HmacKey>,
-	sortable_keys: Vec<SortableKey>,
+	keys: Vec<GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>>,
+	hmac_keys: Vec<SearchC::SearchableKeyWrapper>,
+	sortable_keys: Vec<SortC::SortableKeyWrapper>,
 	newest_key_id: SymKeyId,
 	key_map: KeyMap,
 
 	base_url: String,
 	app_token: String,
 
-	//To know what user should be fetched from the cache.
-	// This could not be the same user as it is stored in the group cache
-	// because in the group cache the groups are stored under either the user id or connected group id
-	used_user_id: UserId,
+	_sgen: PhantomData<SGen>,
+	_st_gen: PhantomData<StGen>,
+	_sign_gen: PhantomData<SignGen>,
+	_search_gen: PhantomData<SearchGen>,
+	_sort_gen: PhantomData<SortGen>,
+	_sc: PhantomData<SC>,
+	_st_c: PhantomData<StC>,
+	_sign_c: PhantomData<SignC>,
+	_search_c: PhantomData<SearchC>,
+	_sort_c: PhantomData<SortC>,
+	_pc: PhantomData<PC>,
+	_vc: PhantomData<VC>,
+	_pwh: PhantomData<PwH>,
 }
 
-impl Group
+impl<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+	Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
+where
+	SGen: SymKeyGenWrapper,
+	StGen: StaticKeyPairWrapper,
+	SignGen: SignKeyPairWrapper,
+	SearchGen: SearchableKeyGen,
+	SortGen: SortableKeyGen,
+	SC: SymKeyComposerWrapper,
+	StC: StaticKeyComposerWrapper,
+	SignC: SignComposerWrapper,
+	SearchC: SearchableKeyComposerWrapper,
+	SortC: SortableKeyComposerWrapper,
+	PC: PkFromUserKeyWrapper,
+	VC: VerifyKFromUserKeyWrapper,
+	PwH: PwHash,
 {
 	#[allow(clippy::too_many_arguments)]
 	fn new_group(
@@ -92,7 +142,6 @@ impl Group
 		joined_time: u128,
 		rank: i32,
 		is_connected_group: bool,
-		used_user_id: UserId,
 		access_by_parent: Option<GroupId>,
 		access_by_group_as_member: Option<GroupId>,
 		key_len: usize,
@@ -111,7 +160,6 @@ impl Group
 			joined_time,
 			rank,
 			is_connected_group,
-			used_user_id,
 			access_by_parent,
 			access_by_group_as_member,
 			keys: Vec::with_capacity(key_len),
@@ -119,15 +167,29 @@ impl Group
 			sortable_keys: Vec::with_capacity(sort_key_len),
 			newest_key_id: "".to_string(),
 			key_map: Default::default(),
+
+			_sgen: Default::default(),
+			_st_gen: Default::default(),
+			_sign_gen: Default::default(),
+			_search_gen: Default::default(),
+			_sort_gen: Default::default(),
+			_sc: Default::default(),
+			_st_c: Default::default(),
+			_sign_c: Default::default(),
+			_search_c: Default::default(),
+			_sort_c: Default::default(),
+			_pc: Default::default(),
+			_vc: Default::default(),
+			_pwh: Default::default(),
 		}
 	}
 
+	#[allow(clippy::type_complexity)]
 	pub fn from_server(
 		base_url: String,
 		app_token: String,
 		server_data: sentc_crypto::entities::group::GroupOutData,
-		actual_user_id: UserId,
-	) -> Result<GroupFromServerReturn, SentcError>
+	) -> Result<GroupFromServerReturn<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>, SentcError>
 	{
 		let parent = server_data.access_by_parent_group.is_some();
 
@@ -148,7 +210,6 @@ impl Group
 			server_data.joined_time,
 			server_data.rank,
 			server_data.is_connected_group,
-			actual_user_id,
 			server_data.access_by_parent_group,
 			server_data.access_by_group_as_member,
 			key_len,
@@ -186,21 +247,26 @@ impl Group
 		self.rank
 	}
 
-	pub fn get_newest_hmac_key(&self) -> &HmacKey
+	pub fn get_newest_hmac_key(&self) -> &SearchC::SearchableKeyWrapper
 	{
 		&self.hmac_keys[0]
 	}
 
-	pub fn get_newest_sortable_key(&self) -> &SortableKey
+	pub fn get_newest_sortable_key(&self) -> &SortC::SortableKeyWrapper
 	{
 		&self.sortable_keys[0]
 	}
 
-	pub fn get_group_key(&self, group_key_id: &str) -> Option<&GroupKeyData>
+	pub fn get_group_key(&self, group_key_id: &str) -> Option<&GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>>
 	{
 		self.key_map
 			.get(group_key_id)
 			.and_then(|o| self.keys.get(*o))
+	}
+
+	pub fn has_group_key(&self, group_key_id: &str) -> Option<&usize>
+	{
+		self.key_map.get(group_key_id)
 	}
 
 	pub fn get_access_group_as_member(&self) -> Option<&str>
@@ -219,7 +285,20 @@ impl Group
 
 		let key_session = self.keys.len() > 50;
 
-		Ok(prepare_group_keys_for_new_member(
+		Ok(SdkGroup::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+		>::prepare_group_keys_for_new_member(
 			user_public_key,
 			&keys,
 			key_session,
@@ -257,7 +336,7 @@ impl Group
 		self.access_by_group_as_member.as_ref()
 	}
 
-	pub fn get_newest_key(&self) -> Option<&GroupKeyData>
+	pub fn get_newest_key(&self) -> Option<&GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>>
 	{
 		let index = self.key_map.get(&self.newest_key_id).unwrap_or(&0);
 
@@ -295,7 +374,7 @@ impl Group
 	{
 		let key = self.get_newest_sortable_key();
 
-		Ok(key.encrypt_sortable(number)?)
+		Ok(key.get_key().encrypt_sortable(number)?)
 	}
 
 	pub fn encrypt_sortable_number(&self, number: u64) -> Result<SortableEncryptOutput, SentcError>
@@ -322,12 +401,13 @@ impl Group
 	//==============================================================================================
 	//internal fn
 
-	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SymmetricKey>, bool)
+	pub(crate) fn prepare_group_keys_ref(&self, page: usize) -> (Vec<&SC::SymmetricKeyWrapper>, bool)
 	{
 		prepare_group_keys_ref!(self.keys, page, 50)
 	}
 
-	pub(crate) fn get_last_key(&self) -> Result<&GroupKeyData, SentcError>
+	#[allow(clippy::type_complexity)]
+	pub fn get_last_key(&self) -> Result<&GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>, SentcError>
 	{
 		//keys are always set otherwise there will be an error in the get group fn
 		self.keys.last().ok_or(SentcError::KeyNotFound)
@@ -338,30 +418,45 @@ impl Group
 		self.newest_key_id = id;
 	}
 
-	pub fn set_hmac_key(&mut self, key: &GroupKeyData, hmac_key: GroupHmacData) -> Result<(), SentcError>
+	pub fn set_hmac_key(
+		&mut self,
+		key: &GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>,
+		hmac_key: GroupHmacData,
+	) -> Result<(), SentcError>
 	{
-		decrypt_hmac_key!(&key.group_key, self, hmac_key);
+		let decrypted_hmac_key =
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_hmac_key(
+				&key.group_key,
+				hmac_key,
+			)?;
+
+		self.hmac_keys.push(decrypted_hmac_key);
+
 		Ok(())
 	}
 
-	pub fn set_sortable_key(&mut self, key: &GroupKeyData, sortable_key: GroupSortableData) -> Result<(), SentcError>
+	pub fn set_sortable_key(
+		&mut self,
+		key: &GroupKeyData<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper>,
+		sortable_key: GroupSortableData,
+	) -> Result<(), SentcError>
 	{
-		decrypt_sort_key!(&key.group_key, self, sortable_key);
+		let decrypted_sortable_key =
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_sortable_key(
+				&key.group_key,
+				sortable_key,
+			)?;
+
+		self.sortable_keys.push(decrypted_sortable_key);
+
 		Ok(())
 	}
 
-	fn prepare_for_more_keys(&mut self, keys_len: usize)
+	pub fn set_keys(&mut self, private_key: &impl SkWrapper, key: GroupKeyServerOutput) -> Result<(), SentcError>
 	{
-		//extend the capacity for the next page (max. 50 keys)
-		self.keys.reserve(keys_len);
-		self.key_map.reserve(keys_len);
-	}
-
-	pub fn set_keys(&mut self, private_key: &SecretKey, key: GroupKeyServerOutput) -> Result<(), SentcError>
-	{
-		let key = decrypt_group_keys(private_key, key)?;
+		let key = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_keys(private_key, key)?;
 		self.key_map
-			.insert(key.group_key.key_id.clone(), self.keys.len());
+			.insert(key.group_key.get_id().to_string(), self.keys.len());
 		self.keys.push(key);
 
 		Ok(())
