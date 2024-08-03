@@ -1,7 +1,6 @@
-use sentc_crypto::fips_keys::util::HmacKey;
 pub use sentc_crypto::keys::rec::{RecGroupKeyData, RecUserDataInt, RecUserKeyDataInt};
 use sentc_crypto::rec_keys::core::pw_hash::PwHasher;
-use sentc_crypto::rec_keys::util::{PublicKey, SecretKey, SignKey, SortableKey, SymmetricKey, VerifyKey};
+use sentc_crypto::rec_keys::util::{HmacKey, PublicKey, SecretKey, SignKey, SortableKey, SymmetricKey, VerifyKey};
 
 use crate::group::Group;
 use crate::user::net::UserLoginReturn;
