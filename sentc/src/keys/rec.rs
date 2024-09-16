@@ -53,3 +53,6 @@ pub type RecUserLoginReturn = UserLoginReturn<
 	VerifyKey,
 	PwHasher,
 >;
+
+#[cfg(feature = "network")]
+pub type RecPrepareLoginOtpOutput = sentc_crypto::sdk_utils::full::user::PrepareLoginOtpOutput<sentc_crypto::rec_keys::core::hmac::HmacKey>;

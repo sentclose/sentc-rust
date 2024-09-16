@@ -54,3 +54,6 @@ pub type FipsUserLoginReturn = UserLoginReturn<
 	VerifyKey,
 	PwHasherGetter,
 >;
+
+#[cfg(feature = "network")]
+pub type RecPrepareLoginOtpOutput = sentc_crypto::sdk_utils::full::user::PrepareLoginOtpOutput<sentc_crypto::fips_keys::core::hmac::HmacKey>;
