@@ -1,3 +1,5 @@
+#![doc=include_str!("../../doc/user.md")]
+
 pub mod crypto_sync;
 #[cfg(feature = "network")]
 pub mod net;
@@ -29,6 +31,9 @@ use crate::error::SentcError;
 use crate::group::prepare_group_keys_ref;
 use crate::KeyMap;
 
+/// The user struct holds all information about the user.
+///
+/// A user got its user group and device keys.
 pub struct User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
 where
 	SGen: SymKeyGenWrapper,
