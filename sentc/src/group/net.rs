@@ -319,6 +319,7 @@ where
 		self.decrypt_group_keys(user, parent_group, data)
 	}
 
+	#[allow(clippy::type_complexity)]
 	pub fn done_fetch_group_key_after_rotation(
 		&mut self,
 		data: GroupKeyServerOutput,
@@ -330,7 +331,8 @@ where
 
 		self.decrypt_group_keys(user, parent_group, data)?;
 
-		Ok(self.set_newest_key_id(newest_key_id))
+		self.set_newest_key_id(newest_key_id);
+		Ok(())
 	}
 
 	#[allow(clippy::type_complexity)]
@@ -426,14 +428,12 @@ where
 				{
 					user_private_keys.push(key.encrypted_eph_key_key_id.clone());
 				}
-			} else {
-				if parent_group
-					.ok_or(SentcError::GroupNotFound)?
-					.has_group_key(&key.encrypted_eph_key_key_id)
-					.is_none()
-				{
-					group_private_keys.push(key.encrypted_eph_key_key_id.clone());
-				}
+			} else if parent_group
+				.ok_or(SentcError::GroupNotFound)?
+				.has_group_key(&key.encrypted_eph_key_key_id)
+				.is_none()
+			{
+				group_private_keys.push(key.encrypted_eph_key_key_id.clone());
 			}
 		}
 

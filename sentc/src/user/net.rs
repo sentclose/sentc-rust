@@ -233,6 +233,7 @@ where
 		Ok(&self.jwt)
 	}
 
+	#[allow(clippy::type_complexity)]
 	pub async fn prepare_get_group(
 		&self,
 		group_id: &str,
@@ -241,7 +242,7 @@ where
 	{
 		let jwt = self.get_jwt()?;
 
-		let gam = if let Some(g) = group_as_member { Some(g.get_group_id()) } else { None };
+		let gam = group_as_member.map(|g| g.get_group_id());
 
 		Group::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>::prepare_fetch_group(
 			group_id,
