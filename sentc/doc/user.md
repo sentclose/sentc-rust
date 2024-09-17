@@ -193,3 +193,164 @@ require a fresh jwt like deleting user or changing mfa settings. This is to be s
 just stolen the jwt.
 
 To get a fresh jwt this functions will always ask for the user password and the mfa tokens if the user set it.
+
+## Reset password
+
+In sentc passwords can only reset if the user is logged in and got access to the keys. Because sentc don't know the
+clear text keys it can't reset the password on the server.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn reset_password(user: &StdUser)
+{
+	user.reset_password("new_password").await.unwrap();
+}
+````
+
+## Change password
+
+To change the password has to know the old password.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn change_password(user: &StdUser)
+{
+	user.change_password("old_password", "new_password", Some("auth_token_if_any".to_string()), None).await.unwrap();
+}
+````
+
+## Update username / device name
+
+This function will change the name of the device. The user needs to be logged in with the new username not the old one.
+The old is then free to use by another user.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn change_password(user: &mut StdUser)
+{
+	user.update_user("new_user_name".to_string()).await.unwrap();
+}
+````
+
+## Delete user
+
+All devices will be deleted.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn delete_user(user: &StdUser)
+{
+	user.delete("password", Some("auth_token_if_any".to_string()), None).await.unwrap();
+}
+````
+
+Or just delete any device of the user. It doesn't need to be the current device. Use the password of the current device.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn delete_device(user: &StdUser, device_id: &str)
+{
+	user.delete_device("password", device_id, Some("auth_token_if_any".to_string()), None).await.unwrap();
+}
+````
+
+## Register a new device
+
+These are two parts. One on the new device and the other on the current device to accept the new device. Then the new
+device got access to all groups of the current device.
+
+### On the new device
+
+The server res needs to be sent to an existing device. Like with a QR code.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn start_register_new_device()
+{
+	let server_res = StdUser::register_device_start("base_url".to_string(), "app_token", "device_identifier", "device_password").await.unwrap();
+}
+````
+
+### On the existing device
+
+````rust
+use sentc::keys::StdUser;
+
+async fn end_device_register(user: &StdUser, server_res: String)
+{
+	user.register_device(server_res).await.unwrap();
+}
+````
+
+## Get all devices
+
+A list of all devices that are registered to this user account.
+
+````rust
+use sentc::keys::StdUser;
+
+async fn get_list(user: &StdUser)
+{
+	let list = user.get_devices(None).await.unwrap();
+
+	//To get more devices use:
+
+	let list = user.get_devices(Some(&list.last().unwrap())).await.unwrap();
+}
+````
+
+## Key rotation
+
+Just like in groups, users can also do a key rotation. New keys are generated and used and the old will only use the
+decrypt all data.
+
+The rotation can be started from any device and needs to finish on the other devices so that they got the new keys too.
+
+To start it:
+
+````rust
+async fn start_rotation(user: &mut StdUser)
+{
+	user.key_rotation().await.unwrap();
+}
+````
+
+After the rotation use this function to get the new keys for the other devices:
+
+````rust
+async fn finish_rotation(user: &mut StdUser)
+{
+	user.finish_key_rotation().await.unwrap();
+}
+````
+
+## Public user data
+
+To get the public or verify key of any user call this functions:
+
+For the newest public key:
+
+````rust
+async fn get_public_key(user: &StdUser, user_id: &str)
+{
+	let public_key = user.get_user_public_key_data(user_id).await.unwrap();
+}
+````
+
+For verify key:
+
+````rust
+async fn get_verify_key(user: &StdUser, user_id: &str, verify_key_id: &str)
+{
+	let verify_key = user.get_user_verify_key_data(user_id, verify_key_id).await.unwrap();
+}
+````
+
+The verify key is called by id because it is needed to check a signature that was signed with a specific key pair. For
+the public key, only the latest key should be used to encrypt something for that user.
