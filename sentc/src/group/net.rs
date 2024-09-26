@@ -27,6 +27,7 @@ use sentc_crypto::util_req_full::group::{
 	get_groups_for_user,
 	get_invites_for_user,
 	get_join_reqs,
+	get_member,
 	get_sent_join_req,
 	join_req,
 	kick_user,
@@ -45,6 +46,7 @@ use crate::crypto_common::group::{
 	GroupJoinReqList,
 	GroupKeyServerOutput,
 	GroupSortableData,
+	GroupUserListItem,
 	KeyRotationInput,
 	ListGroups,
 };
@@ -587,6 +589,30 @@ where
 			&self.app_token,
 			jwt,
 			self.get_group_id(),
+			self.access_by_group_as_member.as_deref(),
+		)
+		.await?)
+	}
+
+	//______________________________________________________________________________________________
+
+	pub async fn get_member(&self, jwt: &str, last_item: Option<&GroupUserListItem>) -> Result<Vec<GroupUserListItem>, SentcError>
+	{
+		check_jwt(jwt)?;
+
+		let (last_time, last_id) = if let Some(li) = last_item {
+			(li.joined_time, li.user_id.as_str())
+		} else {
+			(0, "none")
+		};
+
+		Ok(get_member(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			self.get_group_id(),
+			last_time.to_string().as_str(),
+			last_id,
 			self.access_by_group_as_member.as_deref(),
 		)
 		.await?)
