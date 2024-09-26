@@ -910,6 +910,9 @@ async fn test_52_invite_a_user_to_the_child_group()
 
 	let pk = u0.get_user_public_key_data(u.get_user_id()).await.unwrap();
 
+	//test manually invite
+	let _invite = cg.prepare_group_keys_for_new_member(&pk, Some(2)).unwrap();
+
 	cg.invite_auto(u0.get_jwt().unwrap(), u.get_user_id(), &pk, Some(2))
 		.await
 		.unwrap();
