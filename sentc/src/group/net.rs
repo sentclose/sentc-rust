@@ -874,6 +874,41 @@ where
 		Ok(())
 	}
 
+	pub async fn handle_invite_session_keys_for_new_member(
+		&self,
+		jwt: &str,
+		user_key: &UserPublicKeyData,
+		session_id: String,
+		auto: bool,
+	) -> Result<(), SentcError>
+	{
+		let mut i = 1;
+		loop {
+			let (next_keys, next_page) = self.prepare_group_keys_ref(i);
+
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::invite_user_session(
+				self.base_url.clone(),
+				&self.app_token,
+				jwt,
+				self.get_group_id(),
+				&session_id,
+				auto,
+				user_key,
+				&next_keys,
+				self.access_by_group_as_member.as_deref(),
+			)
+			.await?;
+
+			if !next_page {
+				break;
+			}
+
+			i += 1;
+		}
+
+		Ok(())
+	}
+
 	//______________________________________________________________________________________________
 	//join req
 
