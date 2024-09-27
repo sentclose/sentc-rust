@@ -1,3 +1,5 @@
+#![doc=include_str!("../../doc/group.md")]
+
 pub mod crypto_sync;
 #[cfg(feature = "file")]
 pub mod file;
@@ -16,6 +18,7 @@ use sentc_crypto::sdk_common::{GroupId, SymKeyId};
 use sentc_crypto::sdk_core::cryptomat::{PwHash, SearchableKeyGen, SortableKey as CoreSort, SortableKeyGen};
 use sentc_crypto::sdk_utils::cryptomat::{
 	PkFromUserKeyWrapper,
+	PkWrapper,
 	SearchableKeyComposerWrapper,
 	SearchableKeyWrapper,
 	SignComposerWrapper,
@@ -31,7 +34,9 @@ use sentc_crypto::sdk_utils::cryptomat::{
 	VerifyKFromUserKeyWrapper,
 };
 
+use crate::crypto_common::UserId;
 use crate::error::SentcError;
+use crate::user::User;
 use crate::KeyMap;
 
 macro_rules! prepare_group_keys_ref {
@@ -277,6 +282,71 @@ where
 	pub fn prepare_update_rank(&self, user_id: &str, new_rank: i32) -> Result<String, SentcError>
 	{
 		Ok(prepare_change_rank(user_id, new_rank, self.rank)?)
+	}
+
+	pub fn prepare_create_child_group(&self) -> Result<(String, String), SentcError>
+	{
+		let latest_key = self
+			.get_newest_key()
+			.map(|o| &o.public_group_key)
+			.ok_or(SentcError::KeyNotFound)?;
+
+		Ok((
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::prepare_create(latest_key)?,
+			latest_key.get_id().to_string(),
+		))
+	}
+
+	#[allow(clippy::type_complexity)]
+	pub fn manually_key_rotation(
+		&self,
+		sign: bool,
+		user_id: UserId,
+		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+	) -> Result<String, SentcError>
+	{
+		let pk = if !self.from_parent && self.access_by_group_as_member.is_none() {
+			user.ok_or(SentcError::UserNotFound)?
+				.get_newest_public_key()
+				.ok_or(SentcError::KeyNotFound)?
+		} else {
+			&parent_group
+				.ok_or(SentcError::GroupNotFound)?
+				.get_newest_key()
+				.ok_or(SentcError::KeyNotFound)?
+				.public_group_key
+		};
+
+		let sign_key = if sign && user.is_some() {
+			user.ok_or(SentcError::UserNotFound)?.get_newest_sign_key()
+		} else {
+			None
+		};
+
+		Ok(SdkGroup::<
+			SGen,
+			StGen,
+			SignGen,
+			SearchGen,
+			SortGen,
+			SC,
+			StC,
+			SignC,
+			SearchC,
+			SortC,
+			PC,
+			VC,
+		>::key_rotation(
+			&self
+				.get_newest_key()
+				.ok_or(SentcError::KeyNotFound)?
+				.group_key,
+			pk,
+			false,
+			sign_key,
+			user_id,
+		)?)
 	}
 
 	pub fn prepare_group_keys_for_new_member(&self, user_public_key: &UserPublicKeyData, new_user_rank: Option<i32>) -> Result<String, SentcError>
