@@ -1,6 +1,7 @@
 #![doc=include_str!("../../doc/user.md")]
 
 pub mod crypto_sync;
+mod export;
 #[cfg(feature = "network")]
 pub mod net;
 
