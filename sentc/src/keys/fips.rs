@@ -4,6 +4,7 @@ use sentc_crypto::fips_keys::util::{HmacKey, PublicKey, SecretKey, SignKey, Sort
 pub use sentc_crypto::keys::fips::{FipsGroupKeyData, FipsUserDataInt, FipsUserKeyDataInt};
 
 use crate::group::Group;
+#[cfg(feature = "network")]
 use crate::user::net::UserLoginReturn;
 use crate::user::User;
 
@@ -39,6 +40,7 @@ pub type FipsUser = User<
 	PwHasherGetter,
 >;
 
+#[cfg(feature = "network")]
 pub type FipsUserLoginReturn = UserLoginReturn<
 	SymmetricKey,
 	SecretKey,

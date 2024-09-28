@@ -3,6 +3,7 @@ use sentc_crypto::std_keys::core::PwHasherGetter;
 use sentc_crypto::std_keys::util::{HmacKey, PublicKey, SecretKey, SignKey, SortableKey, SymmetricKey, VerifyKey};
 
 use crate::group::Group;
+#[cfg(feature = "network")]
 use crate::user::net::UserLoginReturn;
 use crate::user::User;
 
@@ -38,6 +39,7 @@ pub type StdUser = User<
 	PwHasherGetter,
 >;
 
+#[cfg(feature = "network")]
 pub type StdUserLoginReturn = UserLoginReturn<
 	SymmetricKey,
 	SecretKey,
