@@ -176,6 +176,30 @@ async fn test_10_create_and_fetch_a_group()
 }
 
 #[tokio::test]
+async fn test_10_x_export_group()
+{
+	let u = USER_0_TEST_STATE.get().unwrap().read().await;
+
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let group_id = g.get_group_id();
+
+	let (data, fetch_res) = u.prepare_get_group(&group_id, None).await.unwrap();
+
+	assert!(matches!(fetch_res, GroupFetchResult::Ok));
+
+	let group = u.done_get_group(data, None).unwrap();
+
+	let group_str = group.to_string().unwrap();
+
+	let _group: TestGroup = group_str.parse().unwrap();
+
+	//now test with ref
+	let group_str = g.to_string_ref().unwrap();
+
+	let _group: TestGroup = group_str.parse().unwrap();
+}
+
+#[tokio::test]
 async fn test_11_get_all_groups_to_user()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;

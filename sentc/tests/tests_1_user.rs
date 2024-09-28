@@ -79,6 +79,29 @@ async fn test_11_register_and_login_user()
 }
 
 #[tokio::test]
+async fn test_11_x_export_user()
+{
+	let user = TestUser::login_forced(
+		"http://127.0.0.1:3002".into(),
+		"5zMb6zs3dEM62n+FxjBilFPp+j9e7YUFA+7pi6Hi",
+		USERNAME,
+		PW,
+	)
+	.await
+	.unwrap();
+
+	let user_str = user.to_string().unwrap();
+
+	let _user: TestUser = user_str.parse().unwrap();
+
+	//test with user ref
+	let u = &USER_TEST_STATE.get().unwrap().read().await;
+	let user_str = u.0.to_string_ref().unwrap();
+
+	let _user: TestUser = user_str.parse().unwrap();
+}
+
+#[tokio::test]
 async fn test_12_change_password()
 {
 	let u = &USER_TEST_STATE.get().unwrap().read().await;
