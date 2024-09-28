@@ -15,7 +15,7 @@ repository = "https://github.com/sentclose/sentc-rust"
 documentation = "https://sentc.com/"
 
 [workspace.dependencies]
-sentc-crypto = { version = "0.14.0", default-features = false, features = ["server_test"] }
+sentc-crypto = { version = "0.14.1", default-features = false, features = ["server_test"] }
 #sentc-crypto = { git = "https://github.com/sentclose/sentc.git", rev = "b61a3483c6d75752104d00ff475824dc12358346", default-features = false, features = ["server_test"] }
 #sentc-crypto = { path = "../../sdk/crypto", default-features = false, features = ["server_test"] } # for local dev
 

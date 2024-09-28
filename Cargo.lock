@@ -763,7 +763,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -1260,9 +1260,9 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a4b3995c9047483b3ec31930764a6bf71b99dafcdccef560b680d7697b29413"
+checksum = "ac75df70720323edf828c7d3bd888dc1b7c8fc91bf3037fe56f66e78492e05db"
 dependencies = [
  "base64ct",
  "sentc-crypto-common",
@@ -1297,9 +1297,9 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-fips-keys"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d069b8e86ee00108579352e06378b13512e1b7f50075805d12e81b2fc34e4aaf"
+checksum = "662e7f66e89cf00dbe5a69578928f0e88cd95f1270f8004b49ba187fe8686e95"
 dependencies = [
  "base64ct",
  "digest",
@@ -1328,9 +1328,9 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-rec-keys"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b790d27f3166e02b39a58ab04ebd0fdf2ed7171822c83e979b841296570605e7"
+checksum = "4167c449b11167f8c1f911d92ac82a337811b6cb33f0dad36eaaddc3ba88db7c"
 dependencies = [
  "argon2",
  "digest",
@@ -1347,9 +1347,9 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-std-keys"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ab139cbdf8932a4aeff91393c81729ba1861b132d6e495ef9ea1831176c3217"
+checksum = "578183348ceb810f6bbcc0ef28eec322464dd4a28bfc883c2f14e0ed87bc101e"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -1372,9 +1372,9 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto-utils"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "643059f9f38650fa2dc63f0d2f13080fb883935030b15713424ef4d9d7d839ba"
+checksum = "3c7ca5510d33ab904394df7ba50bdbec23bddc7d74416da126f340e600d66d38"
 dependencies = [
  "base64ct",
  "pem-rfc7468",
