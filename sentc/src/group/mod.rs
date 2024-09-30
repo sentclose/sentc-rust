@@ -1,6 +1,7 @@
 #![doc=include_str!("../../doc/group.md")]
 #![doc=include_str!("../../doc/encrypt_group.md")]
 #![doc=include_str!("../../doc/searchable.md")]
+#![doc=include_str!("../../doc/sortable.md")]
 #![doc=include_str!("../../doc/file.md")]
 
 pub mod crypto_sync;
