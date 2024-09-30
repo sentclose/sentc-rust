@@ -1,4 +1,5 @@
 #![doc=include_str!("../../doc/user.md")]
+#![doc=include_str!("../../doc/encrypt_user.md")]
 
 pub mod crypto_sync;
 mod export;
