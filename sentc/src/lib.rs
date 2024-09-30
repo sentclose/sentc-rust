@@ -1,5 +1,5 @@
 #![doc=include_str!("../../README.md")]
-#![allow(clippy::tabs_in_doc_comments)]
+#![allow(clippy::tabs_in_doc_comments, rustdoc::bare_urls)]
 
 pub mod error;
 #[cfg(feature = "file")]
