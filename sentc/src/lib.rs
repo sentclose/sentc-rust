@@ -1,4 +1,11 @@
 #![doc=include_str!("../../README.md")]
+#![doc=include_str!("../doc/user.md")]
+#![doc=include_str!("../doc/encrypt_user.md")]
+#![doc=include_str!("../doc/group.md")]
+#![doc=include_str!("../doc/encrypt_group.md")]
+#![doc=include_str!("../doc/searchable.md")]
+#![doc=include_str!("../doc/sortable.md")]
+#![doc=include_str!("../doc/file.md")]
 #![allow(clippy::tabs_in_doc_comments, rustdoc::bare_urls)]
 
 pub mod error;
