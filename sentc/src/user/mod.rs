@@ -4,6 +4,7 @@
 
 pub mod crypto_sync;
 mod export;
+pub mod file;
 #[cfg(feature = "network")]
 pub mod net;
 
