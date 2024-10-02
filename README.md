@@ -25,6 +25,19 @@ But this gives you the flexibility to use it in your programs without compromise
 
 There is no init function anymore. You can just use the functions you need.
 
+## Install
+
+Please choose an implementation of the algorithms. There are StdKeys, FIPS or Rec keys. The impl can not work together.
+
+- StdKeys (feature = std_keys) are a pure rust implementation of the algorithms. They can be used in the web with wasm
+  and on mobile.
+- FIPS keys (feature = fips_keys) are FIPS approved algorithms used from Openssl Fips. This impl does not support post
+  quantum.
+- Rec keys (feature = rec_keys) or recommended keys are a mix of FIPS keys for the classic algorithms and oqs (for post
+  quantum).
+
+The net feature is necessary for the requests to the backend. The library reqwest is used to do it.
+
 ## Usage
 
 In all doc examples we are using the StdKeys implementation. You can switch it by changing the features and use other
