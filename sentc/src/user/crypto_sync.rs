@@ -16,6 +16,7 @@ use sentc_crypto::sdk_utils::cryptomat::{
 	VerifyKFromUserKeyWrapper,
 };
 
+use crate::crypto_common::crypto::GeneratedSymKeyHeadServerOutput;
 use crate::error::SentcError;
 use crate::user::User;
 
@@ -110,16 +111,14 @@ where
 	//==============================================================================================
 	//sym key
 
-	pub fn generate_non_registered_key(&self, reply_key: &UserPublicKeyData) -> Result<(SGen::SymmetricKeyWrapper, String), SentcError>
+	pub fn generate_non_registered_key(
+		&self,
+		reply_key: &UserPublicKeyData,
+	) -> Result<(SGen::SymmetricKeyWrapper, GeneratedSymKeyHeadServerOutput), SentcError>
 	{
 		let (raw_key, key_out) = KeyGenerator::<SGen, SC, PC>::generate_non_register_sym_key_by_public_key(reply_key)?;
 
-		Ok((
-			raw_key,
-			key_out
-				.to_string()
-				.map_err(|_| SentcError::JsonToStringFailed)?,
-		))
+		Ok((raw_key, key_out))
 	}
 
 	pub fn get_non_registered_key_sync(&self, master_key_id: &str, server_out: &str) -> Result<SC::SymmetricKeyWrapper, SentcError>
