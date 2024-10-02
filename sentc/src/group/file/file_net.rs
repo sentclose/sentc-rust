@@ -24,22 +24,8 @@ use tokio::fs::File;
 use crate::error::SentcError;
 use crate::file::downloader_net::{check_if_file_exists, download_file_meta_information, FileEncryptorDownload};
 use crate::file::uploader_net::FileEncryptorUpload;
-use crate::file::DefaultCallback;
+use crate::file::{DefaultCallback, FileCreateOutput, FileDownloadOutput};
 use crate::group::Group;
-
-pub struct FileCreateOutput
-{
-	pub file_id: String,
-	pub master_key_id: String,
-	pub encrypted_file_name: Option<String>,
-}
-
-pub struct FileDownloadOutput<S: SymKeyWrapper>
-{
-	pub file_data: FileData,
-	pub key: S,
-	pub file_name: Option<String>,
-}
 
 impl<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
 	Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>
