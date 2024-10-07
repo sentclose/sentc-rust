@@ -6,6 +6,12 @@
 #![doc=include_str!("../doc/searchable.md")]
 #![doc=include_str!("../doc/sortable.md")]
 #![doc=include_str!("../doc/file.md")]
+#![doc=include_str!("../doc/create-app.md")]
+//! # Advanced
+#![doc=include_str!("../doc/protocol.md")]
+#![doc=include_str!("../doc/end-to-end-encrypted-database.md")]
+#![doc=include_str!("../doc/backend-only.md")]
+#![doc=include_str!("../doc/self-hosted.md")]
 #![allow(clippy::tabs_in_doc_comments, rustdoc::bare_urls)]
 
 pub mod error;
