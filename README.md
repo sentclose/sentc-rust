@@ -25,7 +25,26 @@ But this gives you the flexibility to use it in your programs without compromise
 
 There is no init function anymore. You can just use the functions you need.
 
-## Install
+## Usage
+
+In all doc examples we are using the StdKeys implementation. You can switch it by changing the features and use other
+implementation or even write your own.
+
+### Create an account and an app
+
+To use the sdk, you need a public and secret token.
+
+The public token will be used in your sdk at the frontend and the secret token should only be used at your backend.
+You can set what function should be called with which token.
+
+1. Got to [https://api.sentc.com/dashboard/register](https://api.sentc.com/dashboard/register) and create an account.
+   You will be redirected to the account dashboard.
+2. Verify the email. We email you to make sure that your email address belongs to you.
+3. In your dashboard click on the blue button: New App. You will get the app tokens and the first jwt keys.
+
+Now you are ready to use the sdk.
+
+### Install the sdk.
 
 Please choose an implementation of the algorithms. There are StdKeys, FIPS or Rec keys. The impl can not work together.
 
@@ -38,40 +57,58 @@ Please choose an implementation of the algorithms. There are StdKeys, FIPS or Re
 
 The net feature is necessary for the requests to the backend. The library reqwest is used to do it.
 
-## Usage
-
-In all doc examples we are using the StdKeys implementation. You can switch it by changing the features and use other
-implementation or even write your own.
-
-### Register a user
+```bash
+cargo add sentc
+```
 
 ````rust
-use sentc::keys::StdUser;
+use sentc::keys::{StdUser, StdGroup};
 
-async fn register()
+async fn example()
 {
-	let user_id = StdUser::register("the-username", "the-password").unwrap();
-}
-````
+	//register a user
+	let user_id = StdUser::register("base_url".to_string(), "app_token".to_string(), "the-username", "the-password").await.unwrap();
 
-### Login a user
-
-````rust
-use sentc::keys::StdUser;
-
-async fn login()
-{
-	let login_res = StdUser::login("base_url".to_string(), "app_token", "username", "password").await.unwrap();
-}
-````
-
-### Login with ignoring 2fa
-
-````rust
-use sentc::keys::StdUser;
-
-async fn login()
-{
+	//login a user, ignoring possible Multi-factor auth
 	let user = StdUser::login_forced("base_url".to_string(), "app_token", "username", "password").await.unwrap();
+
+	//create a group
+	let group_id = user.create_group().await.unwrap();
+
+	//get a group. first check if there are any data that the user need before decrypting the group keys.
+	let (data, res) = user.prepare_get_group("group_id", None).await.unwrap();
+
+	//if no data then just decrypt the group keys
+	assert!(matches!(res, GroupFetchResult::Ok));
+
+	let group = user.done_get_group(data, None).unwrap();
+
+	//invite another user to the group. Not here in the example because we only got one user so far
+	group.invite_auto(user.get_jwt().unwrap(), "user_id_to_invite", user_public_key, None).await.unwrap();
+
+	//encrypt a string for the group
+	let encrypted = group.encrypt_string_sync("hello there!").unwrap();
+
+	//now every user in the group can decrypt the string
+	let decrypted = group.decrypt_string_sync(encrypted, None).unwrap();
+
+	//delete a group
+	group.delete_group(user.get_jwt().unwrap()).await.unwrap();
+
+	//delete a user
+	user.delete("password", None, None).await.unwrap();
 }
 ````
+
+## Limitations
+
+The protocol is designed for async long-running communication between groups.
+
+- A group member should be able to decrypt the whole communication even if they joined years after the beginning.
+- Group member should get decrypt all messages even if they were offline for years.
+
+The both requirements make perfect forward secrecy impossible. See more at the Protocol how we solved it.
+
+## Contact
+
+If you want to learn more, just contact me [contact@sentclose.com](mailto:contact@sentclose.com).
