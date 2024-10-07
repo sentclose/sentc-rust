@@ -164,10 +164,10 @@ use sentc::keys::StdGroup;
 
 async fn example(group: &StdGroup, jwt_from_user: &str)
 {
-	group.invite("user_id_to_invite", user_public_key, None).await.unwrap();
+	group.invite(jwt_from_user, "user_id_to_invite", user_public_key, None).await.unwrap();
 
 	//with optional rank, in this case rank 1
-	group.invite("user_id_to_invite", user_public_key, Some(1)).await.unwrap();
+	group.invite(jwt_from_user, "user_id_to_invite", user_public_key, Some(1)).await.unwrap();
 }
 ````
 
