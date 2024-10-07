@@ -1,4 +1,4 @@
-#![doc=include_str!("../../README.md")]
+#![doc=include_str!("../README.md")]
 #![doc=include_str!("../doc/user.md")]
 #![doc=include_str!("../doc/encrypt_user.md")]
 #![doc=include_str!("../doc/group.md")]
