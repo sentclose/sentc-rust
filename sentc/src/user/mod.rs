@@ -177,7 +177,7 @@ where
 	}
 
 	#[cfg(not(feature = "network"))]
-	#[allow(clippy::too_many_arguments)]
+	#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 	pub fn new(
 		base_url: String,
 		app_token: String,
@@ -413,13 +413,13 @@ where
 		)?)
 	}
 
-	fn set_newest_key_id(&mut self, id: SymKeyId)
+	pub fn set_newest_key_id(&mut self, id: SymKeyId)
 	{
 		self.newest_key_id = id;
 	}
 
 	#[allow(clippy::type_complexity)]
-	fn extend_user_key(
+	pub fn extend_user_key(
 		&mut self,
 		user_keys: UserKeyDataInt<SC::SymmetricKeyWrapper, StC::SkWrapper, StC::PkWrapper, SignC::SignKWrapper, SignC::VerifyKWrapper>,
 	)
