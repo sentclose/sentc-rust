@@ -365,8 +365,10 @@ where
 		Ok(())
 	}
 
-	pub fn prepare_create_group(&self) -> Result<String, SentcError>
+	pub fn prepare_create_group(&self, sign: bool) -> Result<String, SentcError>
 	{
+		let sign_key = if sign { self.get_newest_sign_key() } else { None };
+
 		Ok(SdkGroup::<
 			SGen,
 			StGen,
@@ -383,6 +385,8 @@ where
 		>::prepare_create(
 			self.get_newest_public_key()
 				.ok_or(SentcError::KeyNotFound)?,
+			sign_key,
+			self.user_id.to_string(),
 		)?)
 	}
 

@@ -39,7 +39,7 @@ use sentc_crypto::sdk_utils::cryptomat::{
 	VerifyKFromUserKeyWrapper,
 };
 
-use crate::crypto_common::UserId;
+use crate::crypto_common::user::UserVerifyKeyData;
 use crate::error::SentcError;
 use crate::user::User;
 use crate::KeyMap;
@@ -64,6 +64,11 @@ macro_rules! prepare_group_keys_ref {
 }
 
 pub(crate) use prepare_group_keys_ref;
+
+/// Set verify keys for each group key, optional
+/// The index of each verify key should match the index of the group key in the group key vec.
+/// For verification, a key can be skipped by setting the verify key to None.
+pub type GroupKeyVerifyKeys<'a> = Option<&'a [Option<&'a UserVerifyKeyData>]>;
 
 pub type GroupFromServerReturn<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH> = (
 	Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>,
@@ -289,15 +294,27 @@ where
 		Ok(prepare_change_rank(user_id, new_rank, self.rank)?)
 	}
 
-	pub fn prepare_create_child_group(&self) -> Result<(String, String), SentcError>
+	#[allow(clippy::type_complexity)]
+	pub fn prepare_create_child_group(
+		&self,
+		sign: bool,
+		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+	) -> Result<(String, String), SentcError>
 	{
 		let latest_key = self
 			.get_newest_key()
 			.map(|o| &o.public_group_key)
 			.ok_or(SentcError::KeyNotFound)?;
 
+		let (sign_key, user_id) = match (sign, user) {
+			(true, Some(user)) => (user.get_newest_sign_key(), user.get_user_id().to_string()),
+			_ => (None, Default::default()),
+		};
+
 		Ok((
-			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::prepare_create(latest_key)?,
+			SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::prepare_create(
+				latest_key, sign_key, user_id,
+			)?,
 			latest_key.get_id().to_string(),
 		))
 	}
@@ -306,7 +323,6 @@ where
 	pub fn manually_key_rotation(
 		&self,
 		sign: bool,
-		user_id: UserId,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 	) -> Result<String, SentcError>
@@ -323,10 +339,9 @@ where
 				.public_group_key
 		};
 
-		let sign_key = if sign && user.is_some() {
-			user.ok_or(SentcError::UserNotFound)?.get_newest_sign_key()
-		} else {
-			None
+		let (sign_key, user_id) = match (sign, user) {
+			(true, Some(user)) => (user.get_newest_sign_key(), user.get_user_id().to_string()),
+			_ => (None, Default::default()),
 		};
 
 		Ok(SdkGroup::<
@@ -527,9 +542,18 @@ where
 		Ok(())
 	}
 
-	pub fn set_keys(&mut self, private_key: &impl SkWrapper, key: GroupKeyServerOutput) -> Result<(), SentcError>
+	pub fn set_keys(
+		&mut self,
+		private_key: &impl SkWrapper,
+		key: GroupKeyServerOutput,
+		verify_key: Option<&UserVerifyKeyData>,
+	) -> Result<(), SentcError>
 	{
-		let key = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_keys(private_key, key)?;
+		let key = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::decrypt_group_keys(
+			private_key,
+			key,
+			verify_key,
+		)?;
 		self.key_map
 			.insert(key.group_key.get_id().to_string(), self.keys.len());
 		self.keys.push(key);
