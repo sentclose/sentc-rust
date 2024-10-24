@@ -1,3 +1,4 @@
+mod export;
 #[cfg(feature = "network")]
 pub mod net;
 
@@ -34,9 +35,9 @@ pub struct User
 
 impl User
 {
-	fn new_user(base_url: String, app_token: String, user_identifier: String, data: UserDataInt, mfa: bool) -> Result<Self, SentcError>
+	fn new_user(base_url: String, app_token: String, user_identifier: String, data: UserDataInt, mfa: bool) -> Self
 	{
-		Ok(Self {
+		Self {
 			user_id: data.user_id,
 			user_identifier,
 			device_id: data.device_id,
@@ -52,11 +53,11 @@ impl User
 
 			base_url,
 			app_token,
-		})
+		}
 	}
 
 	#[cfg(not(feature = "network"))]
-	pub fn new(base_url: String, app_token: String, user_identifier: String, data: UserDataInt, mfa: bool) -> Result<Self, SentcError>
+	pub fn new(base_url: String, app_token: String, user_identifier: String, data: UserDataInt, mfa: bool) -> Self
 	{
 		Self::new_user(base_url, app_token, user_identifier, data, mfa)
 	}

@@ -32,7 +32,6 @@ use sentc_crypto_light::util_req_full::user::{
 	PreLoginOut,
 	PrepareLoginOtpOutput,
 };
-use sentc_crypto_light::UserDataInt;
 
 use crate::error::SentcError;
 use crate::group::Group;
@@ -395,17 +394,6 @@ impl User
 
 	//==============================================================================================
 
-	pub(crate) async fn set_user(
-		base_url: String,
-		app_token: String,
-		user_identifier: String,
-		data: UserDataInt,
-		mfa: bool,
-	) -> Result<Self, SentcError>
-	{
-		Self::new_user(base_url, app_token, user_identifier, data, mfa)
-	}
-
 	async fn get_fresh_jwt(&self, username: &str, password: &str, mfa_token: Option<String>, mfa_recovery: Option<bool>)
 		-> Result<String, SentcError>
 	{
@@ -476,7 +464,7 @@ pub async fn login(base_url: String, app_token: String, device_identifier: &str,
 
 	match out {
 		PreLoginOut::Direct(data) => {
-			let user = User::set_user(base_url, app_token, device_identifier.to_string(), data, false).await?;
+			let user = User::new_user(base_url, app_token, device_identifier.to_string(), data, false);
 
 			Ok(UserLoginReturn::Direct(user))
 		},
@@ -490,7 +478,7 @@ pub async fn login_forced(base_url: String, app_token: String, device_identifier
 
 	match out {
 		PreLoginOut::Direct(data) => {
-			let user = User::set_user(base_url, app_token, device_identifier.to_string(), data, false).await?;
+			let user = User::new_user(base_url, app_token, device_identifier.to_string(), data, false);
 
 			Ok(user)
 		},
@@ -517,7 +505,7 @@ pub async fn mfa_login(
 	)
 	.await?;
 
-	let user = User::set_user(base_url, app_token, device_identifier.to_string(), data, true).await?;
+	let user = User::new_user(base_url, app_token, device_identifier.to_string(), data, true);
 
 	Ok(user)
 }
@@ -541,7 +529,7 @@ pub async fn mfa_recovery_login(
 	)
 	.await?;
 
-	let user = User::set_user(base_url, app_token, device_identifier.to_string(), data, true).await?;
+	let user = User::new_user(base_url, app_token, device_identifier.to_string(), data, true);
 
 	Ok(user)
 }

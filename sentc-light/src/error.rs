@@ -1,4 +1,5 @@
 use sentc_crypto_light::error::SdkLightError;
+use sentc_crypto_light::sdk_utils::error::SdkUtilError;
 
 #[derive(Debug)]
 pub enum SentcError
@@ -34,5 +35,13 @@ impl From<sentc_crypto_light::sdk_core::Error> for SentcError
 	fn from(value: sentc_crypto_light::sdk_core::Error) -> Self
 	{
 		value.into()
+	}
+}
+
+impl From<SdkUtilError> for SentcError
+{
+	fn from(value: SdkUtilError) -> Self
+	{
+		Self::Sdk(SdkLightError::Util(value))
 	}
 }
