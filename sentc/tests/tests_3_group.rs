@@ -4,6 +4,7 @@ use std::time::Duration;
 use sentc::error::SentcError;
 use sentc::group::net::{GroupFetchResult, GroupFinishKeyRotation, GroupKeyFetchResult};
 use sentc::split_head_and_encrypted_string;
+use sentc_crypto::sdk_utils::error::SdkUtilError;
 use sentc_crypto::SdkError;
 use tokio::sync::{OnceCell, RwLock};
 use tokio::time::sleep;
@@ -160,13 +161,62 @@ async fn test_10_create_and_fetch_a_group()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = u.create_group().await.unwrap();
+	let group_id = u.create_group(true).await.unwrap();
 
 	let (data, fetch_res) = u.prepare_get_group(&group_id, None).await.unwrap();
 
 	assert!(matches!(fetch_res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	assert_eq!(
+		data.keys
+			.first()
+			.as_ref()
+			.unwrap()
+			.signed_by_user_id
+			.as_ref()
+			.unwrap(),
+		&u.get_user_id().to_string()
+	);
+
+	assert_eq!(
+		data.keys
+			.first()
+			.as_ref()
+			.unwrap()
+			.signed_by_user_sign_key_id
+			.as_deref()
+			.unwrap(),
+		&u.get_user_keys(
+			data.keys
+				.first()
+				.as_ref()
+				.unwrap()
+				.signed_by_user_sign_key_id
+				.as_deref()
+				.unwrap(),
+		)
+		.unwrap()
+		.exported_verify_key
+		.verify_key_id
+	);
+
+	//use the only verify key from the user.
+	let mut verify_keys = Vec::with_capacity(data.keys.len());
+
+	for key in &data.keys {
+		let verify_key = if let (Some(_user_id), Some(key_id)) = (&key.signed_by_user_id, &key.signed_by_user_sign_key_id) {
+			//in the real world fetch this key based on the id in the group data.
+			u.get_user_keys(key_id).map(|o| &o.exported_verify_key)
+		} else {
+			None
+		};
+
+		verify_keys.push(verify_key);
+	}
+
+	assert_eq!(verify_keys.len(), 1);
+
+	let group = u.done_get_group(data, None, Some(&verify_keys)).unwrap();
 
 	assert_eq!(group_id, group.get_group_id());
 
@@ -183,11 +233,11 @@ async fn test_10_x_export_group()
 	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
 	let group_id = g.get_group_id();
 
-	let (data, fetch_res) = u.prepare_get_group(&group_id, None).await.unwrap();
+	let (data, fetch_res) = u.prepare_get_group(group_id, None).await.unwrap();
 
 	assert!(matches!(fetch_res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	let group_str = group.to_string().unwrap();
 
@@ -197,6 +247,34 @@ async fn test_10_x_export_group()
 	let group_str = g.to_string_ref().unwrap();
 
 	let _group: TestGroup = group_str.parse().unwrap();
+}
+
+#[tokio::test]
+async fn test_10_xx_verify_group_with_wrong_key()
+{
+	let u = USER_0_TEST_STATE.get().unwrap().read().await;
+	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
+
+	let g = GROUP_0_TEST_STATE.get().unwrap().read().await;
+	let group_id = g.get_group_id();
+
+	let (data, fetch_res) = u.prepare_get_group(group_id, None).await.unwrap();
+
+	assert!(matches!(fetch_res, GroupFetchResult::Ok));
+
+	//use the wrong key
+	let err = u.done_get_group(
+		data,
+		None,
+		Some(&[Some(&u1.get_newest_key().unwrap().exported_verify_key)]),
+	);
+
+	assert!(matches!(
+		err,
+		Err(SentcError::Sdk(SdkError::Util(SdkUtilError::Base(
+			sentc_crypto::sdk_core::Error::KeyDecryptionVerifyFailed
+		))))
+	));
 }
 
 #[tokio::test]
@@ -224,7 +302,7 @@ async fn test_12_not_get_group_as_non_member()
 	let err = u.prepare_get_group(g_id, None).await;
 
 	match err {
-		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+		Err(SentcError::Sdk(SdkError::Util(SdkUtilError::ServerErr(c, _)))) => {
 			assert_eq!(c, 310);
 		},
 		_ => panic!("should be server error"),
@@ -264,7 +342,7 @@ async fn test_14_get_invite_for_2nd_user()
 
 	//2nd page
 
-	let list = u.get_group_invites(list.get(0)).await.unwrap();
+	let list = u.get_group_invites(list.first()).await.unwrap();
 
 	assert_eq!(list.len(), 0);
 }
@@ -316,6 +394,7 @@ async fn test_17_accept_the_invite()
 #[tokio::test]
 async fn test_18_fetch_the_group_as_new_user()
 {
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
 
 	let out = u.get_groups(None).await.unwrap();
@@ -326,7 +405,22 @@ async fn test_18_fetch_the_group_as_new_user()
 
 	assert!(matches!(fetch_res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let user_key = &u0
+		.get_user_keys(
+			data.keys
+				.first()
+				.as_ref()
+				.unwrap()
+				.signed_by_user_sign_key_id
+				.as_deref()
+				.unwrap(),
+		)
+		.unwrap()
+		.exported_verify_key;
+
+	let group = u
+		.done_get_group(data, None, Some(&[Some(user_key)]))
+		.unwrap();
 
 	GROUP_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -375,7 +469,7 @@ async fn test_20_auto_invite_user()
 
 	assert!(matches!(fetch_res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	let mut g_state = GROUP_1_TEST_STATE.get().unwrap().write().await;
 
@@ -411,13 +505,7 @@ async fn test_22_start_key_rotation()
 	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
 	let res = g
-		.prepare_key_rotation(
-			u0.get_jwt().unwrap(),
-			false,
-			u0.get_user_id().to_string(),
-			Some(&u0.0),
-			None,
-		)
+		.prepare_key_rotation(u0.get_jwt().unwrap(), false, Some(&u0.0), None)
 		.await
 		.unwrap();
 
@@ -429,7 +517,7 @@ async fn test_22_start_key_rotation()
 		},
 	};
 
-	g.done_fetch_group_key_after_rotation(data, Some(&u0.0), None)
+	g.done_fetch_group_key_after_rotation(data, Some(&u0.0), None, None)
 		.unwrap();
 
 	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
@@ -497,7 +585,7 @@ async fn test_25_finish_key_rotation()
 	};
 
 	let res = g
-		.done_key_rotation(u1.get_jwt().unwrap(), data, None, Some(&u1.0), None)
+		.done_key_rotation(u1.get_jwt().unwrap(), data, Some(&u1.0), None)
 		.await
 		.unwrap();
 
@@ -508,7 +596,7 @@ async fn test_25_finish_key_rotation()
 			_ => panic!("should be ok"),
 		};
 
-		g.done_fetch_group_key_after_rotation(data, Some(&u1.0), None)
+		g.done_fetch_group_key_after_rotation(data, Some(&u1.0), None, None)
 			.unwrap();
 	}
 
@@ -624,7 +712,7 @@ async fn test_29_send_join_req()
 
 	//2nd page
 
-	let list = u.get_sent_join_req(list.get(0)).await.unwrap();
+	let list = u.get_sent_join_req(list.first()).await.unwrap();
 
 	assert_eq!(list.len(), 0);
 }
@@ -647,7 +735,7 @@ async fn test_30_get_join_req_in_group()
 
 	//2nd page
 	let list = g
-		.get_join_requests(u0.get_jwt().unwrap(), list.get(0))
+		.get_join_requests(u0.get_jwt().unwrap(), list.first())
 		.await
 		.unwrap();
 
@@ -748,7 +836,7 @@ async fn test_35_fetch_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	GROUP_2_TEST_STATE
 		.get_or_init(|| async { RwLock::new(GroupState(group)) })
@@ -829,7 +917,7 @@ async fn test_39_not_kick_a_user_with_higher_rank()
 	let err = g.kick_user(u2.get_jwt().unwrap(), u.get_user_id()).await;
 
 	match err {
-		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+		Err(SentcError::Sdk(SdkError::Util(SdkUtilError::ServerErr(c, _)))) => {
 			assert_eq!(c, 316);
 		},
 		_ => panic!("should be error"),
@@ -857,7 +945,7 @@ async fn test_41_not_get_the_group_after_kick()
 	let err = u.prepare_get_group(g.get_group_id(), None).await;
 
 	match err {
-		Err(SentcError::Sdk(SdkError::Util(sentc_crypto::sdk_utils::error::SdkUtilError::ServerErr(c, _)))) => {
+		Err(SentcError::Sdk(SdkError::Util(SdkUtilError::ServerErr(c, _)))) => {
 			assert_eq!(c, 310);
 		},
 		_ => panic!("should be error"),
@@ -881,7 +969,7 @@ async fn test_50_create_a_child_group()
 	assert_eq!(list[0].group_id, id);
 
 	let page_two = g
-		.get_children(u0.get_jwt().unwrap(), Some(list.get(0).unwrap()))
+		.get_children(u0.get_jwt().unwrap(), Some(list.first().unwrap()))
 		.await
 		.unwrap();
 
@@ -894,7 +982,7 @@ async fn test_50_create_a_child_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_group = g.done_get_child_group(data).unwrap();
+	let child_group = g.done_get_child_group(data, None).unwrap();
 
 	CHILD_GROUP
 		.get_or_init(|| async move { RwLock::new(GroupState(child_group)) })
@@ -916,7 +1004,7 @@ async fn test_51_get_child_group_as_member_of_the_parent_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_group = g.done_get_child_group(data).unwrap();
+	let child_group = g.done_get_child_group(data, None).unwrap();
 
 	assert_eq!(
 		child_group.get_newest_key().unwrap().group_key.key_id,
@@ -945,7 +1033,7 @@ async fn test_52_invite_a_user_to_the_child_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_group = u.done_get_group(data, None).unwrap();
+	let child_group = u.done_get_group(data, None, None).unwrap();
 
 	assert_eq!(child_group.get_rank(), 2);
 
@@ -991,7 +1079,7 @@ async fn test_54_get_child_group_by_direct_access()
 	let (data, res) = u.prepare_get_group(g.get_group_id(), None).await.unwrap();
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let g3 = u.done_get_group(data, None).unwrap();
+	let g3 = u.done_get_group(data, None, None).unwrap();
 
 	let (data, res) = g3
 		.prepare_get_child_group(cg.get_group_id(), u.get_jwt().unwrap())
@@ -1000,7 +1088,7 @@ async fn test_54_get_child_group_by_direct_access()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_group = g3.done_get_child_group(data).unwrap();
+	let child_group = g3.done_get_child_group(data, None).unwrap();
 
 	assert_eq!(
 		child_group.get_newest_key().unwrap().group_key.key_id,
@@ -1031,7 +1119,7 @@ async fn test_55_encrypt_in_child_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_1 = g.done_get_child_group(data).unwrap();
+	let child_1 = g.done_get_child_group(data, None).unwrap();
 
 	let encrypted = cg.encrypt_string_sync(STRING_TO_ENCRYPT).unwrap();
 
@@ -1056,13 +1144,7 @@ async fn test_56_key_rotation_in_child_group()
 	let old_key = cg.get_newest_key().unwrap().group_key.key_id.clone();
 
 	let res = cg
-		.prepare_key_rotation(
-			u0.get_jwt().unwrap(),
-			false,
-			u0.get_user_id().to_string(),
-			None,
-			Some(&g.0),
-		)
+		.prepare_key_rotation(u0.get_jwt().unwrap(), false, None, Some(&g.0))
 		.await
 		.unwrap();
 
@@ -1073,7 +1155,7 @@ async fn test_56_key_rotation_in_child_group()
 		},
 	};
 
-	cg.done_fetch_group_key_after_rotation(data, None, Some(&g.0))
+	cg.done_fetch_group_key_after_rotation(data, None, Some(&g.0), None)
 		.unwrap();
 
 	let new_key = cg.get_newest_key().unwrap().group_key.key_id.clone();
@@ -1104,7 +1186,7 @@ async fn test_56_key_rotation_in_child_group()
 	};
 
 	let res = cg
-		.done_key_rotation(u2.get_jwt().unwrap(), data, None, Some(&u2.0), None)
+		.done_key_rotation(u2.get_jwt().unwrap(), data, Some(&u2.0), None)
 		.await
 		.unwrap();
 
@@ -1115,7 +1197,7 @@ async fn test_56_key_rotation_in_child_group()
 			_ => panic!("should be ok"),
 		};
 
-		cg.done_fetch_group_key_after_rotation(data, Some(&u2.0), None)
+		cg.done_fetch_group_key_after_rotation(data, Some(&u2.0), None, None)
 			.unwrap();
 	}
 
@@ -1161,7 +1243,7 @@ async fn test_58_encrypt_with_new_key()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let child_1 = g.done_get_child_group(data).unwrap();
+	let child_1 = g.done_get_child_group(data, None).unwrap();
 
 	let encrypted = cg.encrypt_string_sync(STRING_TO_ENCRYPT).unwrap();
 
@@ -1185,7 +1267,8 @@ async fn test_58_encrypt_with_new_key()
 		_ => panic!("should be ok"),
 	};
 
-	g2.done_fetch_group_key(data, None, Some(&g0.0)).unwrap();
+	g2.done_fetch_group_key(data, None, Some(&g0.0), None)
+		.unwrap();
 
 	let decrypt_3 = g2.decrypt_string_sync(&encrypted, None).unwrap();
 
@@ -1206,13 +1289,7 @@ async fn test_60_start_key_rotation_with_sign()
 	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
 	let res = g
-		.prepare_key_rotation(
-			u0.get_jwt().unwrap(),
-			true,
-			u0.get_user_id().to_string(),
-			Some(&u0),
-			None,
-		)
+		.prepare_key_rotation(u0.get_jwt().unwrap(), true, Some(&u0), None)
 		.await
 		.unwrap();
 
@@ -1223,8 +1300,13 @@ async fn test_60_start_key_rotation_with_sign()
 		},
 	};
 
-	g.done_fetch_group_key_after_rotation(data, Some(&u0.0), None)
-		.unwrap();
+	g.done_fetch_group_key_after_rotation(
+		data,
+		Some(&u0.0),
+		None,
+		Some(&u0.get_newest_key().as_ref().unwrap().exported_verify_key),
+	)
+	.unwrap();
 
 	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
@@ -1255,7 +1337,7 @@ async fn test_61_finish_key_rotation_without_verify()
 	};
 
 	let res = g
-		.done_key_rotation(u1.get_jwt().unwrap(), data, None, Some(&u1.0), None)
+		.done_key_rotation(u1.get_jwt().unwrap(), data, Some(&u1.0), None)
 		.await
 		.unwrap();
 
@@ -1266,7 +1348,7 @@ async fn test_61_finish_key_rotation_without_verify()
 			_ => panic!("should be ok"),
 		};
 
-		g.done_fetch_group_key_after_rotation(data, Some(&u1.0), None)
+		g.done_fetch_group_key_after_rotation(data, Some(&u1.0), None, None)
 			.unwrap();
 	}
 
@@ -1284,13 +1366,7 @@ async fn test_62_start_key_rotation_with_sign()
 	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
 	let res = g
-		.prepare_key_rotation(
-			u0.get_jwt().unwrap(),
-			true,
-			u0.get_user_id().to_string(),
-			Some(&u0.0),
-			None,
-		)
+		.prepare_key_rotation(u0.get_jwt().unwrap(), true, Some(&u0.0), None)
 		.await
 		.unwrap();
 
@@ -1302,8 +1378,13 @@ async fn test_62_start_key_rotation_with_sign()
 		},
 	};
 
-	g.done_fetch_group_key_after_rotation(data, Some(&u0.0), None)
-		.unwrap();
+	g.done_fetch_group_key_after_rotation(
+		data,
+		Some(&u0.0),
+		None,
+		Some(&u0.get_newest_key().as_ref().unwrap().exported_verify_key),
+	)
+	.unwrap();
 
 	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
@@ -1318,6 +1399,7 @@ async fn test_63_finish_key_rotation_with_verify()
 {
 	let mut g = GROUP_1_TEST_STATE.get().unwrap().write().await;
 	let u1 = USER_1_TEST_STATE.get().unwrap().read().await;
+	let u0 = USER_0_TEST_STATE.get().unwrap().read().await;
 
 	let old_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
@@ -1334,7 +1416,7 @@ async fn test_63_finish_key_rotation_with_verify()
 	};
 
 	let res = g
-		.done_key_rotation(u1.get_jwt().unwrap(), data, None, Some(&u1.0), None)
+		.done_key_rotation(u1.get_jwt().unwrap(), data, Some(&u1.0), None)
 		.await
 		.unwrap();
 
@@ -1345,8 +1427,13 @@ async fn test_63_finish_key_rotation_with_verify()
 			_ => panic!("should be ok"),
 		};
 
-		g.done_fetch_group_key_after_rotation(data, Some(&u1.0), None)
-			.unwrap();
+		g.done_fetch_group_key_after_rotation(
+			data,
+			Some(&u1.0),
+			None,
+			Some(&u0.get_newest_key().as_ref().unwrap().exported_verify_key),
+		)
+		.unwrap();
 	}
 
 	let new_newest_key = g.get_newest_key().unwrap().group_key.key_id.clone();

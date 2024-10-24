@@ -128,13 +128,13 @@ async fn test_10_create_and_fetch_group()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = u.create_group().await.unwrap();
+	let group_id = u.create_group(false).await.unwrap();
 
 	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	GROUP_0_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -142,13 +142,13 @@ async fn test_10_create_and_fetch_group()
 
 	let u = USER_1_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = u.create_group().await.unwrap();
+	let group_id = u.create_group(false).await.unwrap();
 
 	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	GROUP_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -156,13 +156,13 @@ async fn test_10_create_and_fetch_group()
 
 	let u = USER_2_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = u.create_group().await.unwrap();
+	let group_id = u.create_group(false).await.unwrap();
 
 	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	GROUP_2_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })
@@ -187,7 +187,7 @@ async fn test_11_create_connected_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let con_group = g.done_get_connected_group(data).unwrap();
+	let con_group = g.done_get_connected_group(data, None).unwrap();
 
 	assert_eq!(con_group.get_group_id(), id);
 	assert_eq!(
@@ -210,13 +210,7 @@ async fn test_12_key_rotation_in_connected_group()
 	let old_key = g.get_newest_key().unwrap().group_key.key_id.clone();
 
 	let res = g
-		.prepare_key_rotation(
-			u0.get_jwt().unwrap(),
-			false,
-			u0.get_user_id().to_string(),
-			None,
-			Some(&pg.0),
-		)
+		.prepare_key_rotation(u0.get_jwt().unwrap(), false, None, Some(&pg.0))
 		.await
 		.unwrap();
 
@@ -228,7 +222,7 @@ async fn test_12_key_rotation_in_connected_group()
 		},
 	};
 
-	g.done_fetch_group_key_after_rotation(data, None, Some(&pg.0))
+	g.done_fetch_group_key_after_rotation(data, None, Some(&pg.0), None)
 		.unwrap();
 
 	let new_key = &g.get_newest_key().unwrap().group_key.key_id;
@@ -272,7 +266,7 @@ async fn test_14_access_group_from_user_with_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, Some(&g1.0)).unwrap();
+	let group = u.done_get_group(data, Some(&g1.0), None).unwrap();
 
 	assert_eq!(group.get_group_id(), g.get_group_id());
 	assert_eq!(group.get_access_group_as_member(), g.get_access_group_as_member())
@@ -314,7 +308,7 @@ async fn test_16_create_child_group_from_connected_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = g.done_get_child_group(data).unwrap();
+	let group = g.done_get_child_group(data, None).unwrap();
 
 	assert_eq!(group.get_access_group_as_member().unwrap(), g1.get_group_id());
 
@@ -346,7 +340,7 @@ async fn test_17_invite_user_to_main_group_to_check_access()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let gu = u.done_get_group(data, None).unwrap();
+	let gu = u.done_get_group(data, None, None).unwrap();
 
 	let (data, res) = u
 		.prepare_get_group(gp.get_group_id(), Some(&gu))
@@ -355,7 +349,7 @@ async fn test_17_invite_user_to_main_group_to_check_access()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let cgp = u.done_get_group(data, Some(&gu)).unwrap();
+	let cgp = u.done_get_group(data, Some(&gu), None).unwrap();
 
 	let (data, res) = cgp
 		.prepare_get_child_group(g1.get_group_id(), u.get_jwt().unwrap())
@@ -364,7 +358,7 @@ async fn test_17_invite_user_to_main_group_to_check_access()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = cgp.done_get_child_group(data).unwrap();
+	let group = cgp.done_get_child_group(data, None).unwrap();
 
 	assert_eq!(group.get_access_group_as_member().unwrap(), g.get_group_id());
 }
@@ -420,7 +414,7 @@ async fn test_20_access_group_after_invite()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let g3 = g1.done_get_connected_group(data).unwrap();
+	let g3 = g1.done_get_connected_group(data, None).unwrap();
 
 	assert_eq!(g3.get_access_group_as_member().unwrap(), g1.get_group_id());
 }
@@ -515,7 +509,7 @@ async fn test_25_fetch_connected_group()
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let gc = g1.done_get_connected_group(data).unwrap();
+	let gc = g1.done_get_connected_group(data, None).unwrap();
 
 	assert_eq!(gc.get_access_group_as_member().unwrap(), g1.get_group_id());
 }
@@ -531,7 +525,7 @@ async fn test_26_get_all_connected_groups()
 	assert_eq!(list.len(), 1);
 
 	let list_2 = g1
-		.get_groups(u1.get_jwt().unwrap(), Some(list.get(0).unwrap()))
+		.get_groups(u1.get_jwt().unwrap(), Some(list.first().unwrap()))
 		.await
 		.unwrap();
 
