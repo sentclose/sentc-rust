@@ -51,9 +51,9 @@ use crate::crypto_common::group::{
 	ListGroups,
 };
 use crate::crypto_common::user::{UserPublicKeyData, UserVerifyKeyData};
-use crate::crypto_common::{SymKeyId, UserId};
+use crate::crypto_common::SymKeyId;
 use crate::error::SentcError;
-use crate::group::Group;
+use crate::group::{Group, GroupKeyVerifyKeys};
 use crate::net_helper::check_jwt;
 use crate::user::User;
 
@@ -146,6 +146,7 @@ where
 	pub fn done_get_child_group(
 		&self,
 		data: GroupOutData,
+		verify_keys: GroupKeyVerifyKeys,
 	) -> Result<Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>, SentcError>
 	{
 		Group::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>::done_fetch_group(
@@ -155,6 +156,7 @@ where
 			data,
 			None,
 			Some(self),
+			verify_keys,
 		)
 	}
 
@@ -179,6 +181,7 @@ where
 	pub fn done_get_connected_group(
 		&self,
 		data: GroupOutData,
+		verify_keys: GroupKeyVerifyKeys,
 	) -> Result<Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>, SentcError>
 	{
 		Group::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>::done_fetch_group(
@@ -188,6 +191,7 @@ where
 			data,
 			None,
 			Some(self),
+			verify_keys,
 		)
 	}
 
@@ -208,6 +212,43 @@ where
 			self.rank,
 			last_key,
 			self.access_by_group_as_member.as_deref(),
+			None,
+			Default::default(),
+		)
+		.await?;
+
+		Ok(group_id)
+	}
+
+	#[allow(clippy::type_complexity)]
+	pub async fn create_child_group_with_sign(
+		&self,
+		jwt: &str,
+		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+	) -> Result<String, SentcError>
+	{
+		check_jwt(jwt)?;
+
+		let last_key = &self
+			.get_newest_key()
+			.ok_or(SentcError::KeyNotFound)?
+			.public_group_key;
+
+		let (sign_key, user_id) = match user {
+			Some(user) => (user.get_newest_sign_key(), user.get_user_id().to_string()),
+			_ => (None, Default::default()),
+		};
+
+		let group_id = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::create_child_group(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			&self.group_id,
+			self.rank,
+			last_key,
+			self.access_by_group_as_member.as_deref(),
+			sign_key,
+			user_id,
 		)
 		.await?;
 
@@ -231,6 +272,43 @@ where
 			self.rank,
 			last_key,
 			self.access_by_group_as_member.as_deref(),
+			None,
+			Default::default(),
+		)
+		.await?;
+
+		Ok(group_id)
+	}
+
+	#[allow(clippy::type_complexity)]
+	pub async fn create_connected_group_with_sign(
+		&self,
+		jwt: &str,
+		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+	) -> Result<String, SentcError>
+	{
+		check_jwt(jwt)?;
+
+		let last_key = &self
+			.get_newest_key()
+			.ok_or(SentcError::KeyNotFound)?
+			.public_group_key;
+
+		let (sign_key, user_id) = match user {
+			Some(user) => (user.get_newest_sign_key(), user.get_user_id().to_string()),
+			_ => (None, Default::default()),
+		};
+
+		let group_id = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::create_connected_group(
+			self.base_url.clone(),
+			&self.app_token,
+			jwt,
+			&self.group_id,
+			self.rank,
+			last_key,
+			self.access_by_group_as_member.as_deref(),
+			sign_key,
+			user_id,
 		)
 		.await?;
 
@@ -316,9 +394,10 @@ where
 		data: GroupKeyServerOutput,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+		verify_key: Option<&UserVerifyKeyData>,
 	) -> Result<(), SentcError>
 	{
-		self.decrypt_group_keys(user, parent_group, data)
+		self.decrypt_group_keys(user, parent_group, data, verify_key)
 	}
 
 	#[allow(clippy::type_complexity)]
@@ -327,11 +406,12 @@ where
 		data: GroupKeyServerOutput,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+		verify_key: Option<&UserVerifyKeyData>,
 	) -> Result<(), SentcError>
 	{
 		let newest_key_id = data.group_key_id.clone();
 
-		self.decrypt_group_keys(user, parent_group, data)?;
+		self.decrypt_group_keys(user, parent_group, data, verify_key)?;
 
 		self.set_newest_key_id(newest_key_id);
 		Ok(())
@@ -342,7 +422,6 @@ where
 		&self,
 		jwt: &str,
 		sign: bool,
-		user_id: UserId,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 	) -> Result<GroupKeyFetchResult, SentcError>
@@ -361,10 +440,13 @@ where
 				.public_group_key
 		};
 
-		let sign_key = if sign && user.is_some() {
-			user.ok_or(SentcError::UserNotFound)?.get_newest_sign_key()
+		let (sign_key, user_id) = if sign && user.is_some() {
+			match user {
+				Some(user) => (user.get_newest_sign_key(), user.get_user_id().to_string()),
+				None => (None, Default::default()),
+			}
 		} else {
-			None
+			(None, Default::default())
 		};
 
 		let key_id = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::key_rotation_req(
@@ -456,7 +538,6 @@ where
 		&self,
 		jwt: &str,
 		keys: Vec<KeyRotationInput>,
-		verify: Option<UserVerifyKeyData>,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 	) -> Result<Vec<GroupKeyFetchResult>, SentcError>
@@ -486,11 +567,6 @@ where
 				.ok_or(SentcError::ParentGroupKeyNotFoundButRequired(
 					key.previous_group_key_id.clone(),
 				))?;
-
-			let vk = match (&verify, &key.signed_by_user_sign_key_id) {
-				(Some(vk), Some(_)) => Some(vk),
-				_ => None,
-			};
 
 			let private_key_id = &key.encrypted_eph_key_key_id;
 
@@ -528,7 +604,6 @@ where
 				&public_key,
 				private_key,
 				false,
-				vk,
 				self.access_by_group_as_member.as_deref(),
 			)
 			.await?;
@@ -1135,6 +1210,7 @@ where
 		data: GroupOutData,
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		parent_group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+		verify_keys: GroupKeyVerifyKeys,
 	) -> Result<Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>, SentcError>
 	{
 		let key_len = data.keys.len();
@@ -1160,8 +1236,16 @@ where
 		group.set_newest_key_id(data.keys[0].group_key_id.clone());
 
 		//in data.keys are all keys of the group not only the first page
-		for key in data.keys {
-			group.decrypt_group_keys(user, parent_group, key)?;
+		if let Some(vk) = verify_keys {
+			for (i, key) in data.keys.into_iter().enumerate() {
+				let verify_key = vk.get(i).copied().flatten();
+
+				group.decrypt_group_keys(user, parent_group, key, verify_key)?;
+			}
+		} else {
+			for key in data.keys {
+				group.decrypt_group_keys(user, parent_group, key, None)?;
+			}
 		}
 
 		for search_key in data.hmac_keys {
@@ -1181,6 +1265,7 @@ where
 		user: Option<&User<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		group: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
 		fetched_keys: GroupKeyServerOutput,
+		verify_key: Option<&UserVerifyKeyData>,
 	) -> Result<(), SentcError>
 	{
 		let key_id = &fetched_keys.user_public_key_id;
@@ -1204,7 +1289,7 @@ where
 			}
 		};
 
-		self.set_keys(private_key, fetched_keys)
+		self.set_keys(private_key, fetched_keys, verify_key)
 	}
 
 	fn decrypt_search_key(&mut self, hmac_key: GroupHmacData) -> Result<(), SentcError>

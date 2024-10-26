@@ -1248,7 +1248,7 @@ checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "sentc"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "dotenv",
  "sentc-crypto",
@@ -1260,17 +1260,17 @@ dependencies = [
 
 [[package]]
 name = "sentc-crypto"
-version = "0.14.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac75df70720323edf828c7d3bd888dc1b7c8fc91bf3037fe56f66e78492e05db"
+checksum = "9887a9a04c012b9999ab7fd64fa011a2917fe5b9c40bbb2b8b375b88b43fbf56"
 dependencies = [
  "base64ct",
- "sentc-crypto-common",
- "sentc-crypto-core",
+ "sentc-crypto-common 0.11.0",
+ "sentc-crypto-core 0.15.0",
  "sentc-crypto-fips-keys",
  "sentc-crypto-rec-keys",
- "sentc-crypto-std-keys",
- "sentc-crypto-utils",
+ "sentc-crypto-std-keys 0.15.0",
+ "sentc-crypto-utils 0.15.0",
  "serde",
  "serde_json",
 ]
@@ -1280,6 +1280,16 @@ name = "sentc-crypto-common"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7591b67878ff3bd5f257784f2c23d93b623e90aec90c4b6d4aed3122a219633"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sentc-crypto-common"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da5042a5a0d5928e91f05a9539f1c6a36e38517dfe49c86f633e5a506f995f86"
 dependencies = [
  "serde",
  "serde_json",
@@ -1296,17 +1306,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentc-crypto-fips-keys"
-version = "0.14.1"
+name = "sentc-crypto-core"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662e7f66e89cf00dbe5a69578928f0e88cd95f1270f8004b49ba187fe8686e95"
+checksum = "5abc19020052e01811475c375d4324518673b6538aa2fe337b194db6aa493eb3"
+dependencies = [
+ "rand_core",
+ "sha2",
+]
+
+[[package]]
+name = "sentc-crypto-fips-keys"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1727ef920e91646cfd6ed4bccf5443bc3a1aec8e860c5c3e370ec34c37df244"
 dependencies = [
  "base64ct",
  "digest",
  "openssl",
- "sentc-crypto-common",
- "sentc-crypto-core",
- "sentc-crypto-utils",
+ "sentc-crypto-common 0.11.0",
+ "sentc-crypto-core 0.15.0",
+ "sentc-crypto-utils 0.15.0",
  "serde",
  "serde_json",
 ]
@@ -1318,29 +1338,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9d74dcd47a52f0c51ae40f250324a5789686d5af35fb1fd99d41a8d6f820761"
 dependencies = [
  "base64ct",
- "sentc-crypto-common",
- "sentc-crypto-core",
- "sentc-crypto-std-keys",
- "sentc-crypto-utils",
+ "sentc-crypto-common 0.10.0",
+ "sentc-crypto-core 0.14.0",
+ "sentc-crypto-std-keys 0.14.1",
+ "sentc-crypto-utils 0.14.1",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "sentc-crypto-rec-keys"
-version = "0.14.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4167c449b11167f8c1f911d92ac82a337811b6cb33f0dad36eaaddc3ba88db7c"
+checksum = "59aadd5219746c1adda87844615676fe6198e72badac0bb6bf54fcefa51469dd"
 dependencies = [
  "argon2",
  "digest",
  "ope",
  "openssl",
  "safe-oqs",
- "sentc-crypto-common",
- "sentc-crypto-core",
+ "sentc-crypto-common 0.11.0",
+ "sentc-crypto-core 0.15.0",
  "sentc-crypto-fips-keys",
- "sentc-crypto-utils",
+ "sentc-crypto-utils 0.15.0",
  "serde",
  "serde_json",
 ]
@@ -1361,9 +1381,34 @@ dependencies = [
  "pqc_dilithium_edit",
  "pqc_kyber_edit",
  "rand_core",
- "sentc-crypto-common",
- "sentc-crypto-core",
- "sentc-crypto-utils",
+ "sentc-crypto-common 0.10.0",
+ "sentc-crypto-core 0.14.0",
+ "sentc-crypto-utils 0.14.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "x25519-dalek",
+]
+
+[[package]]
+name = "sentc-crypto-std-keys"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a50ea1783b4995e737019f0e9088eac0dc706877e3390a306b1bcd27d1149f96"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "base64ct",
+ "ed25519-dalek",
+ "hkdf",
+ "hmac",
+ "ope",
+ "pqc_dilithium_edit",
+ "pqc_kyber_edit",
+ "rand_core",
+ "sentc-crypto-common 0.11.0",
+ "sentc-crypto-core 0.15.0",
+ "sentc-crypto-utils 0.15.0",
  "serde",
  "serde_json",
  "sha2",
@@ -1379,15 +1424,30 @@ dependencies = [
  "base64ct",
  "pem-rfc7468",
  "reqwest",
- "sentc-crypto-common",
- "sentc-crypto-core",
+ "sentc-crypto-common 0.10.0",
+ "sentc-crypto-core 0.14.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sentc-crypto-utils"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "542f5c5cc753a23407b6e767ccce9fec508e59b0b1960de281fdc6766f7d9298"
+dependencies = [
+ "base64ct",
+ "pem-rfc7468",
+ "reqwest",
+ "sentc-crypto-common 0.11.0",
+ "sentc-crypto-core 0.15.0",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "sentc-light"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "sentc-crypto-light",
  "serde",

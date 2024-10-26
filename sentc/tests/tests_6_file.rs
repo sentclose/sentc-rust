@@ -130,13 +130,13 @@ async fn test_10_create_and_fetch_a_group()
 {
 	let u = USER_0_TEST_STATE.get().unwrap().read().await;
 
-	let group_id = u.create_group().await.unwrap();
+	let group_id = u.create_group(false).await.unwrap();
 
 	let (data, res) = u.prepare_get_group(&group_id, None).await.unwrap();
 
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	assert_eq!(group_id, group.get_group_id());
 
@@ -162,7 +162,7 @@ async fn test_11_invite_2nd_user()
 	let (data, res) = u.prepare_get_group(g.get_group_id(), None).await.unwrap();
 	assert!(matches!(res, GroupFetchResult::Ok));
 
-	let group = u.done_get_group(data, None).unwrap();
+	let group = u.done_get_group(data, None, None).unwrap();
 
 	GROUP_1_TEST_STATE
 		.get_or_init(|| async move { RwLock::new(GroupState(group)) })

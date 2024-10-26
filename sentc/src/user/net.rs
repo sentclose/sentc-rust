@@ -49,7 +49,7 @@ use sentc_crypto::util_req_full::user::{
 use crate::crypto_common::user::{UserPublicKeyData, UserVerifyKeyData};
 use crate::error::SentcError;
 use crate::group::net::GroupFetchResult;
-use crate::group::Group;
+use crate::group::{Group, GroupKeyVerifyKeys};
 use crate::net_helper::{check_jwt, get_user_verify_key_data};
 use crate::user::User;
 
@@ -262,6 +262,7 @@ where
 		&self,
 		data: GroupOutData,
 		group_as_member: Option<&Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>>,
+		verify_keys: GroupKeyVerifyKeys,
 	) -> Result<Group<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>, SentcError>
 	{
 		Group::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC, PwH>::done_fetch_group(
@@ -271,12 +272,15 @@ where
 			data,
 			Some(self),
 			group_as_member,
+			verify_keys,
 		)
 	}
 
-	pub async fn create_group(&self) -> Result<GroupId, SentcError>
+	pub async fn create_group(&self, sign: bool) -> Result<GroupId, SentcError>
 	{
 		check_jwt(&self.jwt)?;
+
+		let sign_key = if sign { self.get_newest_sign_key() } else { None };
 
 		let group_id = SdkGroup::<SGen, StGen, SignGen, SearchGen, SortGen, SC, StC, SignC, SearchC, SortC, PC, VC>::create(
 			self.base_url.clone(),
@@ -285,6 +289,8 @@ where
 			self.get_newest_public_key()
 				.ok_or(SentcError::KeyNotFound)?,
 			None,
+			sign_key,
+			self.user_id.clone(),
 		)
 		.await?;
 
