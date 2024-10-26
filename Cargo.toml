@@ -6,7 +6,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license-file = "LICENSE"
 homepage = "https://sentc.com/"
@@ -15,11 +15,11 @@ repository = "https://github.com/sentclose/sentc-rust"
 documentation = "https://sentc.com/"
 
 [workspace.dependencies]
-sentc-crypto = { version = "0.14.1", default-features = false, features = ["server_test"] }
+sentc-crypto = { version = "0.15.0", default-features = false, features = ["server_test"] }
 #sentc-crypto = { git = "https://github.com/sentclose/sentc.git", rev = "b61a3483c6d75752104d00ff475824dc12358346", default-features = false, features = ["server_test"] }
 #sentc-crypto = { path = "../../sdk/crypto", default-features = false, features = ["server_test"] } # for local dev
 
-sentc-crypto-common = "0.10.0"
+sentc-crypto-common = "0.11.0"
 #sentc-crypto-common = { git = "https://github.com/sentclose/sentc-common.git", rev = "15a91d0f2241b9720f1f2f520f484c305b038be1" }
 #sentc-crypto-common = { path = "../../backend/sentc-api/sdk-common" }    # for local dev
 
