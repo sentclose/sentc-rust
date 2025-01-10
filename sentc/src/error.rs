@@ -45,7 +45,7 @@ impl From<serde_json::Error> for SentcError
 {
 	fn from(value: serde_json::Error) -> Self
 	{
-		value.into()
+		Self::Sdk(value.into())
 	}
 }
 
@@ -53,7 +53,7 @@ impl From<sentc_crypto::sdk_core::Error> for SentcError
 {
 	fn from(value: sentc_crypto::sdk_core::Error) -> Self
 	{
-		value.into()
+		Self::Sdk(value.into())
 	}
 }
 

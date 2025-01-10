@@ -61,7 +61,7 @@ where
 		} else {
 			//use the own
 			self.get_newest_exported_public_key()
-				.ok_or_else(|| SentcError::KeyNotFound)?
+				.ok_or(SentcError::KeyNotFound)?
 		};
 
 		let (key, encrypted_key) = self.generate_non_registered_key(reply_key)?;

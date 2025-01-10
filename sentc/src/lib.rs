@@ -34,7 +34,7 @@ pub type KeyMap = HashMap<SymKeyId, usize>;
 /// Helper function to get the head and the encrypted data
 /// Sentc stores some information about the encryption in front of the encrypted data as a head for decryption.
 /// Information about the key and algorithm is used and if it is signed and if so what alg and key was used.
-pub fn split_head_and_encrypted_data<'a, T: serde::Deserialize<'a>>(data_with_head: &'a [u8]) -> Result<(T, &[u8]), error::SentcError>
+pub fn split_head_and_encrypted_data<'a, T: serde::Deserialize<'a>>(data_with_head: &'a [u8]) -> Result<(T, &'a[u8]), error::SentcError>
 {
 	Ok(sentc_crypto::crypto::split_head_and_encrypted_data(data_with_head)?)
 }
